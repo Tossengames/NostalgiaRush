@@ -1,0 +1,42 @@
+[
+  {
+    "question": "Which sacred blade, passed down through the Azuma lineage, is currently wielded by Rikimaru?",
+    "options": ["Natsume", "Izayoi", "Shichishito", "Muramasa"],
+    "answer": "Izayoi",
+    "commentator": "rikimaru",
+    "category": "Characters",
+    "difficulty": "Easy"
+  },
+  {
+    "question": "When a guard is suspicious but has not seen you, what symbol appears on your Ki meter to represent their state?",
+    "options": ["!", "!!", "?", "!?"],
+    "answer": "?",
+    "commentator": "rikimaru",
+    "category": "Stealth",
+    "difficulty": "Easy"
+  },
+  {
+    "question": "What is the traditional ninja tool used for climbing walls and scaling buildings?",
+    "options": ["Kunai", "Shuriken", "Metsubishi", "Shuko"],
+    "answer": "Shuko",
+    "commentator": "ayame",
+    "category": "Tools",
+    "difficulty": "Medium"
+  },
+  {
+    "question": "Which of these is NOT a stealth kill technique in Tenchu?",
+    "options": ["Tsurushi", "Happo Kunai", "Shikoro", "Tobikomi"],
+    "answer": "Happo Kunai",
+    "commentator": "tatsumaru",
+    "category": "Techniques",
+    "difficulty": "Hard"
+  },
+  {
+    "question": "What is the name of the poison that causes immediate death in Tenchu?",
+    "options": ["Dokuso", "Doku-ya", "Koroshi", "Shinobi-doku"],
+    "answer": "Dokuso",
+    "commentator": "rikimaru",
+    "category": "Items",
+    "difficulty": "Medium"
+  }
+]
