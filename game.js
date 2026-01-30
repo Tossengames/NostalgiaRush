@@ -49,7 +49,6 @@ const POINTS_PER_CORRECT = 20;
 const POINTS_PER_GAME_COMPLETION = 50;
 const COINS_PER_CORRECT = 2;
 const COINS_PER_GAME = 10;
-let currentScreen = 'menu';
 
 // ==================== INITIALIZATION & PERSISTENCE ====================
 
@@ -149,9 +148,6 @@ function addGameScore(gameScore, correctCount, totalQuestions) {
     // Save stats
     savePlayerStats();
     
-    // Update live stats
-    updateLiveStats();
-    
     return { score: gameScore, coins: coinsEarned, rankChanged: rankChanged, oldRank: oldRank, newRank: playerStats.currentRank };
 }
 
@@ -188,25 +184,6 @@ function getRankProgress() {
         currentMin: currentMin,
         nextMin: nextMin
     };
-}
-
-// ==================== LIVE STATS ====================
-
-function updateLiveStats() {
-    // Update live score
-    const liveScore = document.getElementById('live-score');
-    if (liveScore) liveScore.textContent = playerStats.totalScore;
-    
-    // Update live coins
-    const liveCoins = document.getElementById('live-coins');
-    if (liveCoins) liveCoins.textContent = playerStats.coins;
-    
-    // Update live rank
-    const liveRank = document.getElementById('live-rank');
-    if (liveRank) {
-        const rankName = rankRequirements[playerStats.currentRank]?.displayName || "APPRENTICE";
-        liveRank.textContent = rankName;
-    }
 }
 
 // ==================== STATS SCREEN ====================
@@ -257,87 +234,6 @@ function updateStatsDisplay() {
         };
         rankNameEl.style.color = rankColors[playerStats.currentRank] || "#808080";
     }
-    
-    // ADD MISSIONS STATS SECTION
-    updateMissionsStats();
-}
-
-function updateMissionsStats() {
-    // Create or update missions stats section
-    let missionsStatsHTML = `
-        <div class="missions-stats-section">
-            <h4><i class="fas fa-flag"></i> MISSIONS STATISTICS</h4>
-            <div class="missions-stats-grid">
-    `;
-    
-    // Add missions stats
-    if (playerStats.missions) {
-        const missions = playerStats.missions;
-        const totalMissions = missions.attempted || 0;
-        const successRate = totalMissions > 0 ? Math.round((missions.completed / totalMissions) * 100) : 0;
-        
-        missionsStatsHTML += `
-            <div class="mission-stat-card">
-                <div class="mission-stat-icon"><i class="fas fa-crosshairs"></i></div>
-                <div class="mission-stat-title">MISSIONS ATTEMPTED</div>
-                <div class="mission-stat-value">${totalMissions}</div>
-            </div>
-            
-            <div class="mission-stat-card">
-                <div class="mission-stat-icon"><i class="fas fa-check-circle"></i></div>
-                <div class="mission-stat-title">MISSIONS COMPLETED</div>
-                <div class="mission-stat-value">${missions.completed || 0}</div>
-            </div>
-            
-            <div class="mission-stat-card">
-                <div class="mission-stat-icon"><i class="fas fa-times-circle"></i></div>
-                <div class="mission-stat-title">MISSIONS FAILED</div>
-                <div class="mission-stat-value">${missions.failed || 0}</div>
-            </div>
-            
-            <div class="mission-stat-card">
-                <div class="mission-stat-icon"><i class="fas fa-percentage"></i></div>
-                <div class="mission-stat-title">SUCCESS RATE</div>
-                <div class="mission-stat-value">${successRate}%</div>
-            </div>
-            
-            <div class="mission-stat-card">
-                <div class="mission-stat-icon"><i class="fas fa-user-secret"></i></div>
-                <div class="mission-stat-title">PERFECT STEALTH</div>
-                <div class="mission-stat-value">${missions.perfectStealth || 0}</div>
-            </div>
-            
-            <div class="mission-stat-card">
-                <div class="mission-stat-icon"><i class="fas fa-skull"></i></div>
-                <div class="mission-stat-title">SILENT KILLS</div>
-                <div class="mission-stat-value">${missions.totalKills || 0}</div>
-            </div>
-        `;
-    } else {
-        missionsStatsHTML += `
-            <div class="no-missions-data">
-                <i class="fas fa-ban"></i>
-                <p>No mission data yet. Complete your first mission!</p>
-            </div>
-        `;
-    }
-    
-    missionsStatsHTML += `
-            </div>
-        </div>
-    `;
-    
-    // Add to stats screen
-    const existingMissionsStats = document.querySelector('.missions-stats-section');
-    if (existingMissionsStats) {
-        existingMissionsStats.innerHTML = missionsStatsHTML;
-    } else {
-        // Insert after rank info box
-        const rankInfoBox = document.querySelector('.rank-info-box');
-        if (rankInfoBox) {
-            rankInfoBox.insertAdjacentHTML('afterend', missionsStatsHTML);
-        }
-    }
 }
 
 // ==================== SCREEN NAVIGATION ====================
@@ -354,7 +250,6 @@ function showScreen(screenId) {
         target.classList.remove('hidden');
         // Small delay to allow CSS transitions
         setTimeout(() => target.classList.add('active'), 50);
-        currentScreen = screenId;
     }
     
     if (typeof createGameVFX === 'function') createGameVFX('screenChange');
@@ -560,11 +455,25 @@ function checkAnswer(selected, correct, commentator) {
     }, 1200);
 }
 
+function showGameSubScreen(type) {
+    const screens = ['question-screen', 'appreciation-screen', 'result-screen'];
+    screens.forEach(s => {
+        const el = document.getElementById(s);
+        if (el) { 
+            el.classList.add('hidden'); 
+            el.classList.remove('active'); 
+        }
+    });
+    const target = document.getElementById(type + '-screen');
+    if (target) { 
+        target.classList.remove('hidden'); 
+        setTimeout(() => target.classList.add('active'), 50);
+    }
+}
+
 // ==================== RESULTS SCREEN ====================
 
 function showResults() {
-    console.log('DEBUG: showResults() called. Element exists:', document.getElementById('result-screen') !== null);
-    
     const totalQuestions = questions.length;
     const percentage = Math.round((correctAnswers / totalQuestions) * 100);
     
@@ -578,7 +487,7 @@ function showResults() {
     // Update results screen
     updateResultsDisplay(pointsEarned, gameResult.coins, totalQuestions, correctAnswers, percentage, gameResult);
     
-    // Show results screen - FIXED: SINGULAR 'result' NOT 'results'
+    // Show results screen
     showGameSubScreen('result');
     
     // Create VFX based on performance
@@ -753,23 +662,7 @@ function showAppreciationScreen() {
     }
 }
 
-// ==================== UTILS & MISSING FUNCTIONS ====================
-
-function showGameSubScreen(type) {
-    const screens = ['question-screen', 'appreciation-screen', 'result-screen'];
-    screens.forEach(s => {
-        const el = document.getElementById(s);
-        if (el) { 
-            el.classList.add('hidden'); 
-            el.classList.remove('active'); 
-        }
-    });
-    const target = document.getElementById(type + '-screen');
-    if (target) { 
-        target.classList.remove('hidden'); 
-        setTimeout(() => target.classList.add('active'), 50);
-    }
-}
+// ==================== UTILS ====================
 
 function shareStats() {
     const rank = document.getElementById('stat-rank-name')?.textContent || 'APPRENTICE';
@@ -801,48 +694,10 @@ function fallbackShare(text) {
     }
 }
 
-// Animate number counting up
-function animateValue(elementId, start, end, duration) {
-    const element = document.getElementById(elementId);
-    if (!element) return;
-    
-    const range = end - start;
-    const startTime = performance.now();
-    
-    function update(currentTime) {
-        const elapsed = currentTime - startTime;
-        const progress = Math.min(elapsed / duration, 1);
-        
-        // Easing function for smooth animation
-        const easeProgress = progress < 0.5 
-            ? 2 * progress * progress 
-            : 1 - Math.pow(-2 * progress + 2, 2) / 2;
-        
-        const currentValue = Math.floor(start + (range * easeProgress));
-        element.textContent = currentValue;
-        
-        if (progress < 1) {
-            requestAnimationFrame(update);
-        } else {
-            element.textContent = end;
-        }
-    }
-    
-    requestAnimationFrame(update);
-}
-
 // ==================== INITIALIZATION ====================
 
 function initializeGame() {
     console.log('Tenchu Shiren - Initializing...');
-    
-    // Lock body scrolling
-    document.body.style.overflow = 'hidden';
-    
-    // Initialize VFX if available
-    if (typeof initVFX === 'function') {
-        initVFX();
-    }
     
     // Load player stats
     loadPlayerStats();
@@ -861,14 +716,6 @@ function initializeGame() {
             }
         });
     }
-    
-    // Update live stats
-    updateLiveStats();
-    
-    // Show menu after a short delay to ensure DOM is ready
-    setTimeout(() => {
-        showScreen('menu');
-    }, 100);
     
     console.log('Game initialized successfully');
 }
@@ -894,6 +741,5 @@ window.startGame = startGame;
 window.showResults = showResults;
 window.shareStats = shareStats;
 window.updateStatsDisplay = updateStatsDisplay;
-window.updateLiveStats = updateLiveStats;
 window.loadPlayerStats = loadPlayerStats;
 window.savePlayerStats = savePlayerStats;
