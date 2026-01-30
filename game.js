@@ -21,18 +21,7 @@ let playerStats = {
     rankStars: 0,
     coins: 0,
     lastPlayed: null,
-    highestRank: "apprentice",
-    missions: {
-        attempted: 0,
-        completed: 0,
-        failed: 0,
-        perfectStealth: 0,
-        totalKills: 0,
-        itemsUsed: 0,
-        favoriteItem: null,
-        bestMission: null,
-        successRate: 0
-    }
+    highestRank: "apprentice"
 };
 
 // Rank requirements matching your HTML/Stats
@@ -149,9 +138,6 @@ function addGameScore(gameScore, correctCount, totalQuestions) {
     // Save stats
     savePlayerStats();
     
-    // Update live stats
-    updateLiveStats();
-    
     return { score: gameScore, coins: coinsEarned, rankChanged: rankChanged, oldRank: oldRank, newRank: playerStats.currentRank };
 }
 
@@ -190,156 +176,6 @@ function getRankProgress() {
     };
 }
 
-// ==================== LIVE STATS ====================
-
-function updateLiveStats() {
-    // Update live score
-    const liveScore = document.getElementById('live-score');
-    if (liveScore) liveScore.textContent = playerStats.totalScore;
-    
-    // Update live coins
-    const liveCoins = document.getElementById('live-coins');
-    if (liveCoins) liveCoins.textContent = playerStats.coins;
-    
-    // Update live rank
-    const liveRank = document.getElementById('live-rank');
-    if (liveRank) {
-        const rankName = rankRequirements[playerStats.currentRank]?.displayName || "APPRENTICE";
-        liveRank.textContent = rankName;
-    }
-}
-
-// ==================== STATS SCREEN ====================
-
-function updateStatsDisplay() {
-    // Update player name
-    const playerNameEl = document.getElementById('stats-player-name');
-    if (playerNameEl) playerNameEl.textContent = playerName.toUpperCase();
-    
-    // Update basic stats
-    document.getElementById('stat-total-score').textContent = playerStats.totalScore;
-    document.getElementById('stat-trials-completed').textContent = playerStats.trialsCompleted;
-    document.getElementById('stat-coins').textContent = playerStats.coins;
-    
-    // Calculate success rate for trials
-    const successRate = playerStats.totalQuestionsAnswered > 0 
-        ? Math.round((playerStats.totalCorrectAnswers / playerStats.totalQuestionsAnswered) * 100)
-        : 0;
-    document.getElementById('stat-success-rate').textContent = `${successRate}%`;
-    
-    // Update rank display
-    const rankName = rankRequirements[playerStats.currentRank]?.displayName || "APPRENTICE";
-    document.getElementById('stat-rank-name').textContent = rankName;
-    
-    // Update stars
-    const starsDisplay = getStarsDisplay(playerStats.rankStars);
-    document.getElementById('stat-rank-stars').textContent = starsDisplay;
-    
-    // Update progress bar
-    const progress = getRankProgress();
-    document.getElementById('stat-rank-progress-text').textContent = `${playerStats.totalScore}/${progress.required}`;
-    
-    const progressBar = document.getElementById('stat-rank-progress');
-    if (progressBar) {
-        progressBar.style.width = `${progress.percent}%`;
-    }
-    
-    // Set rank color
-    const rankNameEl = document.getElementById('stat-rank-name');
-    if (rankNameEl) {
-        const rankColors = {
-            "apprentice": "#808080",
-            "shinobi": "#9370db",
-            "assassin": "#dc143c",
-            "ninja": "#4169e1",
-            "masterNinja": "#c0c0c0",
-            "grandMaster": "#d4af37"
-        };
-        rankNameEl.style.color = rankColors[playerStats.currentRank] || "#808080";
-    }
-    
-    // ADD MISSIONS STATS SECTION
-    updateMissionsStats();
-}
-
-function updateMissionsStats() {
-    // Create or update missions stats section
-    let missionsStatsHTML = `
-        <div class="missions-stats-section">
-            <h4><i class="fas fa-flag"></i> MISSIONS STATISTICS</h4>
-            <div class="missions-stats-grid">
-    `;
-    
-    // Add missions stats
-    if (playerStats.missions) {
-        const missions = playerStats.missions;
-        const totalMissions = missions.attempted || 0;
-        const successRate = totalMissions > 0 ? Math.round((missions.completed / totalMissions) * 100) : 0;
-        
-        missionsStatsHTML += `
-            <div class="mission-stat-card">
-                <div class="mission-stat-icon"><i class="fas fa-crosshairs"></i></div>
-                <div class="mission-stat-title">MISSIONS ATTEMPTED</div>
-                <div class="mission-stat-value">${totalMissions}</div>
-            </div>
-            
-            <div class="mission-stat-card">
-                <div class="mission-stat-icon"><i class="fas fa-check-circle"></i></div>
-                <div class="mission-stat-title">MISSIONS COMPLETED</div>
-                <div class="mission-stat-value">${missions.completed || 0}</div>
-            </div>
-            
-            <div class="mission-stat-card">
-                <div class="mission-stat-icon"><i class="fas fa-times-circle"></i></div>
-                <div class="mission-stat-title">MISSIONS FAILED</div>
-                <div class="mission-stat-value">${missions.failed || 0}</div>
-            </div>
-            
-            <div class="mission-stat-card">
-                <div class="mission-stat-icon"><i class="fas fa-percentage"></i></div>
-                <div class="mission-stat-title">SUCCESS RATE</div>
-                <div class="mission-stat-value">${successRate}%</div>
-            </div>
-            
-            <div class="mission-stat-card">
-                <div class="mission-stat-icon"><i class="fas fa-user-secret"></i></div>
-                <div class="mission-stat-title">PERFECT STEALTH</div>
-                <div class="mission-stat-value">${missions.perfectStealth || 0}</div>
-            </div>
-            
-            <div class="mission-stat-card">
-                <div class="mission-stat-icon"><i class="fas fa-skull"></i></div>
-                <div class="mission-stat-title">SILENT KILLS</div>
-                <div class="mission-stat-value">${missions.totalKills || 0}</div>
-            </div>
-        `;
-    } else {
-        missionsStatsHTML += `
-            <div class="no-missions-data">
-                <i class="fas fa-ban"></i>
-                <p>No mission data yet. Complete your first mission!</p>
-            </div>
-        `;
-    }
-    
-    missionsStatsHTML += `
-            </div>
-        </div>
-    `;
-    
-    // Add to stats screen
-    const existingMissionsStats = document.querySelector('.missions-stats-section');
-    if (existingMissionsStats) {
-        existingMissionsStats.innerHTML = missionsStatsHTML;
-    } else {
-        // Insert after rank info box
-        const rankInfoBox = document.querySelector('.rank-info-box');
-        if (rankInfoBox) {
-            rankInfoBox.insertAdjacentHTML('afterend', missionsStatsHTML);
-        }
-    }
-}
-
 // ==================== SCREEN NAVIGATION ====================
 
 function showScreen(screenId) {
@@ -374,24 +210,6 @@ function showPlayerNameScreen() {
     if (input) {
         setTimeout(() => input.focus(), 300);
     }
-}
-
-function showStatsScreen() {
-    showScreen('stats-screen');
-    updateStatsDisplay();
-}
-
-function showMissionsScreen() {
-    showScreen('missions-screen');
-    // Missions list will be updated by missions.js
-    if (typeof updateMissionsList === 'function') {
-        updateMissionsList();
-    }
-}
-
-function showStatsScreenFromResults() {
-    showScreen('stats-screen');
-    updateStatsDisplay();
 }
 
 // ==================== GAME LOGIC ====================
@@ -682,6 +500,61 @@ function getPerformanceFeedback(character, percentage, correct, total) {
     return "The trial is complete. Your performance has been recorded.";
 }
 
+// ==================== RANKING & STATS ====================
+
+function updateStatsDisplay() {
+    // Update player name
+    const playerNameEl = document.getElementById('stats-player-name');
+    if (playerNameEl) playerNameEl.textContent = playerName.toUpperCase();
+    
+    // Update stats values
+    const set = (id, val) => { 
+        const el = document.getElementById(id); 
+        if (el) el.textContent = val; 
+    };
+    
+    set('stat-total-score', playerStats.totalScore);
+    set('stat-trials-completed', playerStats.trialsCompleted);
+    set('stat-coins', playerStats.coins);
+    
+    // Calculate success rate
+    const successRate = playerStats.totalQuestionsAnswered > 0 
+        ? Math.round((playerStats.totalCorrectAnswers / playerStats.totalQuestionsAnswered) * 100)
+        : 0;
+    set('stat-success-rate', `${successRate}%`);
+    
+    // Update rank display
+    const rankName = rankRequirements[playerStats.currentRank]?.displayName || "APPRENTICE";
+    set('stat-rank-name', rankName);
+    
+    // Update stars
+    const starsDisplay = getStarsDisplay(playerStats.rankStars);
+    set('stat-rank-stars', starsDisplay);
+    
+    // Update progress bar
+    const progress = getRankProgress();
+    set('stat-rank-progress-text', `${playerStats.totalScore}/${progress.required}`);
+    
+    const progressBar = document.getElementById('stat-rank-progress');
+    if (progressBar) {
+        progressBar.style.width = `${progress.percent}%`;
+    }
+    
+    // Set rank color
+    const rankNameEl = document.getElementById('stat-rank-name');
+    if (rankNameEl) {
+        const rankColors = {
+            "apprentice": "#808080",
+            "shinobi": "#9370db",
+            "assassin": "#dc143c",
+            "ninja": "#4169e1",
+            "masterNinja": "#c0c0c0",
+            "grandMaster": "#d4af37"
+        };
+        rankNameEl.style.color = rankColors[playerStats.currentRank] || "#808080";
+    }
+}
+
 // ==================== APPRECIATION SCREEN ====================
 
 function showAppreciationScreen() {
@@ -769,6 +642,20 @@ function showGameSubScreen(type) {
         target.classList.remove('hidden'); 
         setTimeout(() => target.classList.add('active'), 50);
     }
+}
+
+function showStatsScreen() {
+    showScreen('stats-screen');
+    updateStatsDisplay();
+}
+
+function showMissionsScreen() {
+    showScreen('missions-screen');
+}
+
+function showStatsScreenFromResults() {
+    showScreen('stats-screen');
+    updateStatsDisplay();
 }
 
 function shareStats() {
@@ -862,9 +749,6 @@ function initializeGame() {
         });
     }
     
-    // Update live stats
-    updateLiveStats();
-    
     // Show menu after a short delay to ensure DOM is ready
     setTimeout(() => {
         showScreen('menu');
@@ -894,6 +778,5 @@ window.startGame = startGame;
 window.showResults = showResults;
 window.shareStats = shareStats;
 window.updateStatsDisplay = updateStatsDisplay;
-window.updateLiveStats = updateLiveStats;
 window.loadPlayerStats = loadPlayerStats;
 window.savePlayerStats = savePlayerStats;
