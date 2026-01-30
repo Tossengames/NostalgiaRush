@@ -413,7 +413,7 @@
             </div>
         </div>
 
-        <!-- Results Screen - UPDATED FOR SCORE SYSTEM -->
+        <!-- Results Screen -->
         <div id="result-screen" class="game-content hidden">
             <div class="results-container">
                 <div class="results-header">
@@ -500,22 +500,30 @@
     <script src="vfx.js"></script>
     
     <script>
-        // Initialize game
+        // Initialize game with error handling
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('Tenchu Shiren - Initializing...');
+            console.log('Tenchu Shiren - Safe Initialization...');
             
             // Lock body scrolling
             document.body.style.overflow = 'hidden';
             document.documentElement.style.overflow = 'hidden';
             
-            // Initialize VFX
+            // Initialize VFX with error handling
             if (typeof initVFX === 'function') {
-                initVFX();
+                try {
+                    initVFX();
+                } catch (vfxError) {
+                    console.warn("VFX failed to initialize:", vfxError);
+                }
             }
             
-            // Initialize supporters list
+            // Initialize supporters list with error handling
             if (typeof updateSupportersList === 'function') {
-                updateSupportersList();
+                try {
+                    setTimeout(updateSupportersList, 100);
+                } catch (supporterError) {
+                    console.warn("Supporters failed to load:", supporterError);
+                }
             }
             
             // Setup name input
@@ -523,14 +531,20 @@
             if (nameInput) {
                 nameInput.addEventListener('keypress', function(e) {
                     if (e.key === 'Enter') {
-                        setPlayerName();
+                        if (typeof setPlayerName === 'function') {
+                            setPlayerName();
+                        }
                     }
                 });
                 
                 // Focus on input when screen shows
                 nameInput.addEventListener('focus', function() {
                     setTimeout(() => {
-                        this.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        try {
+                            this.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        } catch (scrollError) {
+                            console.warn("Scroll error:", scrollError);
+                        }
                     }, 300);
                 });
             }
@@ -554,14 +568,19 @@
             
             // Handle viewport height for mobile
             function setVH() {
-                const vh = window.innerHeight * 0.01;
-                document.documentElement.style.setProperty('--vh', `${vh}px`);
-                
-                const screens = document.querySelectorAll('.screen');
-                screens.forEach(screen => {
-                    screen.style.height = `${window.innerHeight * 0.85}px`;
-                    screen.style.maxHeight = `${window.innerHeight * 0.85}px`;
-                });
+                try {
+                    const vh = window.innerHeight * 0.01;
+                    document.documentElement.style.setProperty('--vh', `${vh}px`);
+                    
+                    // Set screen heights
+                    const screens = document.querySelectorAll('.screen');
+                    screens.forEach(screen => {
+                        screen.style.height = `${window.innerHeight * 0.85}px`;
+                        screen.style.maxHeight = `${window.innerHeight * 0.85}px`;
+                    });
+                } catch (error) {
+                    console.warn("Viewport height error:", error);
+                }
             }
             
             setVH();
@@ -572,7 +591,11 @@
             
             // Load player stats if available
             if (typeof loadPlayerStats === 'function') {
-                loadPlayerStats();
+                try {
+                    loadPlayerStats();
+                } catch (statsError) {
+                    console.warn("Failed to load player stats:", statsError);
+                }
             }
             
             console.log('Game initialized successfully');
@@ -580,42 +603,63 @@
         
         // New screen functions
         function showStatsScreen() {
-            showScreen('stats-screen');
-            if (typeof updateStatsDisplay === 'function') {
-                updateStatsDisplay();
+            if (typeof showScreen === 'function') {
+                showScreen('stats-screen');
+                if (typeof updateStatsDisplay === 'function') {
+                    try {
+                        updateStatsDisplay();
+                    } catch (error) {
+                        console.warn("Failed to update stats:", error);
+                    }
+                }
             }
         }
         
         function showMissionsScreen() {
-            showScreen('missions-screen');
+            if (typeof showScreen === 'function') {
+                showScreen('missions-screen');
+            }
         }
         
         function showStatsScreenFromResults() {
-            showScreen('stats-screen');
-            if (typeof updateStatsDisplay === 'function') {
-                updateStatsDisplay();
+            if (typeof showScreen === 'function') {
+                showScreen('stats-screen');
+                if (typeof updateStatsDisplay === 'function') {
+                    try {
+                        updateStatsDisplay();
+                    } catch (error) {
+                        console.warn("Failed to update stats:", error);
+                    }
+                }
             }
         }
         
         function shareStats() {
             if (typeof sharePlayerStats === 'function') {
-                sharePlayerStats();
-            } else {
-                const rank = document.getElementById('stat-rank-name').textContent;
-                const stars = document.getElementById('stat-rank-stars').textContent;
-                const text = `I achieved ${rank} ${stars} in Tenchu Shiren! 天誅試練`;
-                
-                if (navigator.share) {
-                    navigator.share({
-                        title: 'Tenchu Shiren - My Shinobi Rank',
-                        text: text,
-                        url: window.location.href
-                    });
-                } else {
-                    navigator.clipboard.writeText(text).then(() => {
-                        alert('Rank copied to clipboard!');
-                    });
+                try {
+                    sharePlayerStats();
+                } catch (error) {
+                    console.warn("Failed to share stats:", error);
+                    // Fallback
+                    const rank = document.getElementById('stat-rank-name')?.textContent || "APPRENTICE";
+                    const stars = document.getElementById('stat-rank-stars')?.textContent || "☆☆☆";
+                    const text = `I achieved ${rank} ${stars} in Tenchu Shiren! 天誅試練`;
+                    
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(text).then(() => {
+                            alert('Rank copied to clipboard!');
+                        }).catch(() => {
+                            alert('Share this text:\n\n' + text);
+                        });
+                    } else {
+                        alert('Share this text:\n\n' + text);
+                    }
                 }
+            } else {
+                // Simple fallback
+                const rank = document.getElementById('stat-rank-name')?.textContent || "APPRENTICE";
+                const stars = document.getElementById('stat-rank-stars')?.textContent || "☆☆☆";
+                alert(`Share: I achieved ${rank} ${stars} in Tenchu Shiren!`);
             }
         }
     </script>
