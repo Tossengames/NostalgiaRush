@@ -1129,7 +1129,90 @@ button:active i, .btn-ninja:active i {
     max-width: 300px;
     margin: 0 auto;
 }
+/* ==================== MISSION FEEDBACK SYSTEM ==================== */
+.mission-feedback {
+    background: rgba(0, 0, 0, 0.8);
+    border: 2px solid var(--blood-red);
+    border-radius: 8px;
+    padding: 15px 20px;
+    margin: 15px 0;
+    text-align: center;
+    display: none;
+    animation: feedbackFadeIn 0.3s ease-out;
+}
 
+@keyframes feedbackFadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.feedback-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    color: var(--parchment);
+    font-size: 1.1rem;
+    font-weight: bold;
+}
+
+.feedback-content i {
+    font-size: 1.3rem;
+}
+
+.mission-feedback.feedback-success {
+    border-color: #00aa00;
+    background: rgba(0, 128, 0, 0.2);
+}
+
+.mission-feedback.feedback-success i {
+    color: #00aa00;
+}
+
+.mission-feedback.feedback-warning {
+    border-color: #d4af37;
+    background: rgba(212, 175, 55, 0.2);
+}
+
+.mission-feedback.feedback-warning i {
+    color: #d4af37;
+}
+
+.mission-feedback.feedback-failure {
+    border-color: var(--blood-bright);
+    background: rgba(139, 0, 0, 0.3);
+}
+
+.mission-feedback.feedback-failure i {
+    color: var(--blood-bright);
+}
+
+.mission-feedback.feedback-item {
+    border-color: #4169e1;
+    background: rgba(65, 105, 225, 0.2);
+}
+
+.mission-feedback.feedback-item i {
+    color: #4169e1;
+}
+
+.mission-feedback.feedback-stealth {
+    border-color: #9370db;
+    background: rgba(147, 112, 219, 0.2);
+}
+
+.mission-feedback.feedback-stealth i {
+    color: #9370db;
+}
+
+.mission-feedback.feedback-info {
+    border-color: var(--smoke);
+    background: rgba(136, 136, 136, 0.2);
+}
+
+.mission-feedback.feedback-info i {
+    color: var(--smoke);
+}
 /* ==================== GAME SCREEN ==================== */
 .game-screen {
     background: var(--game-bg);
