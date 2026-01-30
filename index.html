@@ -1,929 +1,623 @@
-// ============================================
-// TENCHU SHIREN - UPDATED GAME ENGINE
-// Score-based progression system
-// ============================================
-
-// Game state
-let playerName = "Nameless Warrior";
-let currentQuestionIndex = 0;
-let questions = [];
-let gameActive = false;
-let correctAnswers = 0;
-let playerAnswers = [];
-let showAppreciation = false;
-
-// Player progression system
-let playerStats = {
-    totalScore: 0,
-    trialsCompleted: 0,
-    totalCorrectAnswers: 0,
-    totalQuestionsAnswered: 0,
-    currentRank: "apprentice",
-    rankStars: 0,
-    coins: 0,
-    lastPlayed: null,
-    highestRank: "apprentice"
-};
-
-// Rank progression requirements
-const rankRequirements = {
-    "apprentice": { minScore: 0, stars: 3, nextRank: "shinobi", displayName: "APPRENTICE" },
-    "shinobi": { minScore: 100, stars: 3, nextRank: "assassin", displayName: "SHINOBI" },
-    "assassin": { minScore: 300, stars: 3, nextRank: "ninja", displayName: "ASSASSIN" },
-    "ninja": { minScore: 600, stars: 3, nextRank: "masterNinja", displayName: "NINJA" },
-    "masterNinja": { minScore: 1000, stars: 3, nextRank: "grandMaster", displayName: "MASTER NINJA" },
-    "grandMaster": { minScore: 2000, stars: 3, nextRank: null, displayName: "GRAND MASTER" }
-};
-
-// Rank colors
-const rankColors = {
-    "apprentice": "#808080",
-    "shinobi": "#9370db",
-    "assassin": "#dc143c",
-    "ninja": "#4169e1",
-    "masterNinja": "#c0c0c0",
-    "grandMaster": "#d4af37"
-};
-
-// Points system
-const POINTS_PER_CORRECT = 20; // Reduced for slower progression
-const POINTS_PER_GAME_COMPLETION = 50;
-const COINS_PER_CORRECT = 2;
-const COINS_PER_GAME = 10;
-
-// Game elements
-let currentScreen = 'menu';
-
-// ==================== PLAYER PROGRESSION ====================
-
-// Load player stats from localStorage
-function loadPlayerStats() {
-    try {
-        const saved = localStorage.getItem('tenchuShirenStats');
-        if (saved) {
-            const parsed = JSON.parse(saved);
-            playerStats = { ...playerStats, ...parsed };
-            
-            // Ensure all required properties exist
-            if (playerStats.coins === undefined) playerStats.coins = 0;
-            if (playerStats.rankStars === undefined) playerStats.rankStars = 0;
-            if (playerStats.lastPlayed === undefined) playerStats.lastPlayed = new Date().toISOString();
-            if (playerStats.highestRank === undefined) playerStats.highestRank = playerStats.currentRank;
-            
-            console.log("Loaded player stats:", playerStats);
-        }
-        
-        // Load player name if exists
-        const savedName = localStorage.getItem('tenchuShirenPlayerName');
-        if (savedName) {
-            playerName = savedName;
-            document.getElementById('player-name-input').value = playerName;
-        }
-        
-    } catch (error) {
-        console.error("Error loading player stats:", error);
-        // Start fresh if error
-        playerStats = {
-            totalScore: 0,
-            trialsCompleted: 0,
-            totalCorrectAnswers: 0,
-            totalQuestionsAnswered: 0,
-            currentRank: "apprentice",
-            rankStars: 0,
-            coins: 0,
-            lastPlayed: new Date().toISOString(),
-            highestRank: "apprentice"
-        };
-    }
-}
-
-// Save player stats to localStorage
-function savePlayerStats() {
-    try {
-        playerStats.lastPlayed = new Date().toISOString();
-        localStorage.setItem('tenchuShirenStats', JSON.stringify(playerStats));
-        localStorage.setItem('tenchuShirenPlayerName', playerName);
-        console.log("Saved player stats");
-    } catch (error) {
-        console.error("Error saving player stats:", error);
-    }
-}
-
-// Update player rank based on total score
-function updatePlayerRank() {
-    const ranks = Object.keys(rankRequirements);
-    let newRank = "apprentice";
-    let newStars = 0;
-    let rankChanged = false;
-    const oldRank = playerStats.currentRank;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TENCHU SHIREN | 天誅試練</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- VFX Canvas -->
+    <canvas id="vfx-canvas"></canvas>
     
-    // Find current rank based on score
-    for (let i = ranks.length - 1; i >= 0; i--) {
-        const rank = ranks[i];
-        if (playerStats.totalScore >= rankRequirements[rank].minScore) {
-            newRank = rank;
+    <!-- Blood Overlay -->
+    <div id="blood-overlay"></div>
+    
+    <!-- Main Menu -->
+    <div id="menu" class="screen menu-screen active">
+        <div class="screen-header">
+            <div class="japanese-title">天誅試練</div>
+            <h1 class="main-title">TENCHU<br>SHIREN</h1>
+            <div class="subtitle">AZUMA CLAN TRIALS</div>
+        </div>
+        
+        <div class="screen-content">
+            <!-- Updated Main Menu Hook -->
+            <div class="menu-hook">
+                <p class="hook-text">Ready to become an Azuma shinobi?</p>
+                <p class="hook-subtext">Start your trial now!</p>
+                <p class="hook-description">
+                    Your knowledge, judgment, and discipline will be tested.<br>
+                    The masters are watching.
+                </p>
+                <p class="hook-action">
+                    Begin your trial and discover how you would be judged.
+                </p>
+            </div>
             
-            // Calculate stars within this rank
-            const nextRank = rankRequirements[rank].nextRank;
-            if (nextRank) {
-                const currentMin = rankRequirements[rank].minScore;
-                const nextMin = rankRequirements[nextRank].minScore;
-                const progress = playerStats.totalScore - currentMin;
-                const totalRange = nextMin - currentMin;
-                const starProgress = (progress / totalRange) * 3;
-                newStars = Math.min(2, Math.floor(starProgress));
-            } else {
-                // For grand master, show full stars
-                newStars = 2;
+            <div class="menu-buttons">
+                <button class="btn-ninja btn-menu" onclick="showPlayerNameScreen()">
+                    <i class="fas fa-mask"></i>
+                    <span>START TRIAL</span>
+                </button>
+                
+                <button class="btn-ninja btn-menu" onclick="showInfo()">
+                    <i class="fas fa-scroll"></i>
+                    <span>NINJA SCROLLS</span>
+                </button>
+                
+                <button class="btn-ninja btn-menu" onclick="showStatsScreen()">
+                    <i class="fas fa-chart-line"></i>
+                    <span>SHINOBI STATS</span>
+                </button>
+                
+                <button class="btn-ninja btn-menu" onclick="showSupporters()">
+                    <i class="fas fa-users"></i>
+                    <span>CLAN ALLIES</span>
+                </button>
+                
+                <button class="btn-ninja btn-menu" onclick="showMissionsScreen()">
+                    <i class="fas fa-flag"></i>
+                    <span>MISSIONS</span>
+                </button>
+            </div>
+            
+            <div class="menu-footer">
+                <div class="blood-drop"><i class="fas fa-tint"></i></div>
+                <div class="footer-text">A Fan Tribute to Tenchu Series</div>
+                <div class="footer-subtext">非公式ファンゲーム</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Player Name Screen -->
+    <div id="player-name-screen" class="screen hidden name-screen">
+        <div class="screen-header">
+            <h2><i class="fas fa-user-secret"></i> IDENTIFY YOURSELF</h2>
+        </div>
+        
+        <div class="screen-content">
+            <p class="name-instruction">What name shall be whispered in the shadows?</p>
+            
+            <div class="name-input-container">
+                <input type="text" id="player-name-input" placeholder="ENTER NINJA NAME..." maxlength="20" autocomplete="off">
+                <div class="input-icon"><i class="fas fa-pen-nib"></i></div>
+            </div>
+            
+            <div class="name-button-group">
+                <button class="btn-ninja btn-confirm" onclick="setPlayerName()">
+                    <i class="fas fa-check-circle"></i>
+                    <span>CONFIRM IDENTITY</span>
+                </button>
+                
+                <button class="btn-ninja btn-back" onclick="backToMenu()">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>RETURN TO SHADOWS</span>
+                </button>
+            </div>
+            
+            <div class="name-footer">
+                <div class="shuriken"><i class="fas fa-star"></i></div>
+                <p>Your name will be recorded in the Azuma scrolls</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Info Screen -->
+    <div id="info" class="screen hidden info-screen">
+        <div class="screen-header">
+            <h2><i class="fas fa-book-dead"></i> NINJA SCROLLS</h2>
+        </div>
+        
+        <div class="screen-content">
+            <div class="info-section">
+                <h3><i class="fas fa-crosshairs"></i> THE SHINOBI TRIAL</h3>
+                <p class="info-text">
+                    Tenchu: Shiren is a free, fan-made game inspired by the Tenchu series.
+                </p>
+                <p class="info-text">
+                    You will be tested by questions drawn from the world of Tenchu, its characters, tools, rules, and the mindset of a true shinobi.
+                </p>
+                <ul class="info-list">
+                    <li><i class="fas fa-brain"></i> Some questions challenge your memory</li>
+                    <li><i class="fas fa-balance-scale"></i> Others test your judgment in situations faced by Azuma ninja</li>
+                    <li><i class="fas fa-user-ninja"></i> Familiar characters will observe your choices</li>
+                    <li><i class="fas fa-crown"></i> Earn points to increase your shinobi rank</li>
+                </ul>
+            </div>
+            
+            <div class="info-section">
+                <h3><i class="fas fa-exclamation-triangle"></i> DISCLAIMER</h3>
+                <div class="disclaimer-box">
+                    <p>This is a free, fan made project inspired by Tenchu.<br>
+                    It is not affiliated with or endorsed by the original creators or rights holders.<br>
+                    All content is created as a tribute by fans, for fans.</p>
+                </div>
+            </div>
+            
+            <div class="info-section">
+                <h3><i class="fas fa-handshake"></i> HONORED ALLIES</h3>
+                <div class="honor-box">
+                    <p>This fan-made project exists thanks to those who support it.</p>
+                    <p class="support-description">
+                        Your contribution helps keep the trial alive, improve visuals, add new questions, and expand future updates.
+                        Supporters may be honored in-game as Honorary Shinobi, acknowledged by the masters during the trial.
+                    </p>
+                    <button class="btn-ninja btn-support" onclick="window.open('https://ko-fi.com/zesan', '_blank')">
+                        <i class="fas fa-coins"></i>
+                        <span>SUPPORT THE TRIAL</span>
+                    </button>
+                </div>
+            </div>
+            
+            <button class="btn-ninja btn-return" onclick="backToMenu()">
+                <i class="fas fa-door-closed"></i>
+                <span>RETURN TO MENU</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Supporters Screen -->
+    <div id="supporters-screen" class="screen hidden supporters-screen">
+        <div class="screen-header">
+            <h2><i class="fas fa-users"></i> CLAN ALLIES</h2>
+            <div class="subtitle">Honorary Shinobi of the Azuma Clan</div>
+        </div>
+        
+        <div class="screen-content">
+            <div class="appreciation-box">
+                <i class="fas fa-heart blood-icon"></i>
+                <p id="supporter-message">The shadows remember their allies.</p>
+            </div>
+            
+            <div class="supporters-list-container">
+                <h3><i class="fas fa-scroll"></i> HONORED ALLIES</h3>
+                <div class="supporters-scroll">
+                    <ul id="supporters-list" class="supporters-list">
+                        <!-- Supporters will be added by JavaScript -->
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="become-supporter">
+                <h3><i class="fas fa-plus-circle"></i> SUPPORT THE TRIAL</h3>
+                <p>Your contribution helps keep the trial alive and expand future updates</p>
+                <button class="btn-ninja btn-join" onclick="window.open('https://ko-fi.com/zesan', '_blank')">
+                    <i class="fas fa-fist-raised"></i>
+                    <span>BECOME A SUPPORTER</span>
+                </button>
+            </div>
+            
+            <div class="supporters-footer">
+                <button class="btn-ninja btn-back" onclick="backToMenu()">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>RETURN TO MENU</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Screen -->
+    <div id="stats-screen" class="screen hidden stats-screen">
+        <div class="screen-header">
+            <h2><i class="fas fa-chart-line"></i> SHINOBI STATS</h2>
+            <div class="subtitle">Your Journey in the Shadows</div>
+        </div>
+        
+        <div class="screen-content">
+            <div class="stats-welcome">
+                <h3 id="stats-player-name">SHADOW WARRIOR</h3>
+                <p class="stats-subtitle">Your progress in the Azuma trials</p>
+            </div>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-crosshairs"></i></div>
+                    <div class="stat-title">TOTAL SCORE</div>
+                    <div class="stat-value" id="stat-total-score">0</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-gamepad"></i></div>
+                    <div class="stat-title">TRIALS COMPLETED</div>
+                    <div class="stat-value" id="stat-trials-completed">0</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-coins"></i></div>
+                    <div class="stat-title">SHINOBI COINS</div>
+                    <div class="stat-value" id="stat-coins">0</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-percentage"></i></div>
+                    <div class="stat-title">SUCCESS RATE</div>
+                    <div class="stat-value" id="stat-success-rate">0%</div>
+                </div>
+            </div>
+            
+            <div class="rank-display-stats">
+                <div class="rank-title-stats">CURRENT SHINOBI RANK</div>
+                <div class="rank-container">
+                    <div class="rank-name-stats" id="stat-rank-name">APPRENTICE</div>
+                    <div class="rank-stars" id="stat-rank-stars">☆☆☆</div>
+                </div>
+                <div class="rank-progress">
+                    <div class="progress-label">
+                        <span>Progress to next rank</span>
+                        <span id="stat-rank-progress-text">0/100</span>
+                    </div>
+                    <div class="progress-bar-stats">
+                        <div class="progress-fill-stats" id="stat-rank-progress"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="rank-info-box">
+                <h4><i class="fas fa-info-circle"></i> RANK SYSTEM</h4>
+                <p>Your rank is determined by your total score. Earn points by completing trials successfully.</p>
+                <div class="rank-list">
+                    <div class="rank-item">
+                        <span class="rank-badge apprentice">APPRENTICE</span>
+                        <span class="rank-requirement">0+ points</span>
+                    </div>
+                    <div class="rank-item">
+                        <span class="rank-badge shinobi">SHINOBI</span>
+                        <span class="rank-requirement">100+ points</span>
+                    </div>
+                    <div class="rank-item">
+                        <span class="rank-badge assassin">ASSASSIN</span>
+                        <span class="rank-requirement">300+ points</span>
+                    </div>
+                    <div class="rank-item">
+                        <span class="rank-badge ninja">NINJA</span>
+                        <span class="rank-requirement">600+ points</span>
+                    </div>
+                    <div class="rank-item">
+                        <span class="rank-badge masterNinja">MASTER NINJA</span>
+                        <span class="rank-requirement">1000+ points</span>
+                    </div>
+                    <div class="rank-item">
+                        <span class="rank-badge grandMaster">GRAND MASTER</span>
+                        <span class="rank-requirement">2000+ points</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="stats-actions">
+                <button class="btn-ninja btn-share" onclick="shareStats()">
+                    <i class="fas fa-share-alt"></i>
+                    <span>SHARE YOUR RANK</span>
+                </button>
+                
+                <button class="btn-ninja btn-back" onclick="backToMenu()">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>RETURN TO MENU</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Missions Screen -->
+    <div id="missions-screen" class="screen hidden missions-screen">
+        <div class="screen-header">
+            <h2><i class="fas fa-flag"></i> MISSIONS</h2>
+            <div class="subtitle">Azuma Clan Operations</div>
+        </div>
+        
+        <div class="screen-content">
+            <div class="missions-coming-soon">
+                <div class="coming-soon-icon">
+                    <i class="fas fa-hourglass"></i>
+                </div>
+                <h3>UNDER DEVELOPMENT</h3>
+                <p class="coming-soon-text">
+                    The Azuma clan is preparing special operations for elite shinobi.
+                    New missions will be available soon.
+                </p>
+                <p class="coming-soon-details">
+                    Future missions will challenge your skills with unique objectives,
+                    valuable rewards, and opportunities to earn Shinobi Coins.
+                </p>
+                
+                <div class="missions-preview">
+                    <div class="mission-preview-item">
+                        <i class="fas fa-user-secret"></i>
+                        <span>Stealth Infiltration</span>
+                    </div>
+                    <div class="mission-preview-item">
+                        <i class="fas fa-skull-crossbones"></i>
+                        <span>Target Elimination</span>
+                    </div>
+                    <div class="mission-preview-item">
+                        <i class="fas fa-scroll"></i>
+                        <span>Intel Gathering</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="missions-footer">
+                <button class="btn-ninja btn-back" onclick="backToMenu()">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>RETURN TO MENU</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="game" class="screen hidden game-screen">
+        <!-- Question Screen -->
+        <div id="question-screen" class="game-content active">
+            <div class="game-header">
+                <div class="game-title">AZUMA TRIALS</div>
+                <div class="game-info">
+                    <span class="player-display" id="current-player">SHADOW WARRIOR</span>
+                    <span class="score-display">TRIAL <span id="current-trial">1</span>/5</span>
+                </div>
+            </div>
+            
+            <div class="question-container">
+                <div class="question-header">
+                    <div class="trial-number">TRIAL <span id="trial-number">1</span></div>
+                    <div class="difficulty">難易度: <span class="diff-level">中等</span></div>
+                </div>
+                
+                <div class="question-text-container">
+                    <div class="quote-left"><i class="fas fa-quote-left"></i></div>
+                    <h3 id="question-text">A shadow moves in the darkness...</h3>
+                    <div class="quote-right"><i class="fas fa-quote-right"></i></div>
+                </div>
+                
+                <div id="options" class="options-grid">
+                    <!-- Options will be added by JavaScript -->
+                </div>
+                
+                <div class="game-progress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress-fill"></div>
+                    </div>
+                    <div class="progress-text">Trial <span id="progress-current">1</span> of 5</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Appreciation Screen -->
+        <div id="appreciation-screen" class="game-content hidden">
+            <div class="appreciation-container">
+                <div class="appreciation-header">
+                    <h2><i class="fas fa-award"></i> CLAN APPRECIATION</h2>
+                </div>
+                
+                <div class="appreciation-content">
+                    <div class="character-portrait-large" id="appreciation-portrait"></div>
+                    
+                    <div class="appreciation-message">
+                        <p id="appreciation-text">The Azuma clan honors its allies...</p>
+                        <div class="honored-supporter">
+                            <h3 id="honored-name">SUPPORTER NAME</h3>
+                            <p id="honored-handle">@shadow_walker</p>
+                            <div class="supporter-rank">
+                                <i class="fas fa-shield-alt"></i>
+                                <span>HONORED ALLY</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button class="btn-ninja btn-acknowledge" onclick="showResults()">
+                        <i class="fas fa-forward"></i>
+                        <span>SEE YOUR RESULTS</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Screen - UPDATED FOR SCORE SYSTEM -->
+        <div id="result-screen" class="game-content hidden">
+            <div class="results-container">
+                <div class="results-header">
+                    <div class="results-title">TRIAL COMPLETE</div>
+                    <div class="results-subtitle">Your performance has been recorded</div>
+                </div>
+                
+                <div class="results-content">
+                    <!-- Score Display Section -->
+                    <div class="score-results">
+                        <div class="score-title">TRIAL RESULTS</div>
+                        
+                        <div class="score-breakdown">
+                            <div class="score-item">
+                                <div class="score-label">Correct Answers</div>
+                                <div class="score-value" id="result-correct">0/5</div>
+                            </div>
+                            
+                            <div class="score-item highlight">
+                                <div class="score-label">Points Earned</div>
+                                <div class="score-value" id="result-points">+0</div>
+                            </div>
+                            
+                            <div class="score-item">
+                                <div class="score-label">Coins Earned</div>
+                                <div class="score-value" id="result-coins">+0</div>
+                            </div>
+                            
+                            <div class="score-item total">
+                                <div class="score-label">TOTAL SCORE NOW</div>
+                                <div class="score-value" id="result-total">0</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Rank Progress Notification -->
+                        <div class="rank-notification" id="rank-notification">
+                            <i class="fas fa-arrow-up"></i>
+                            <span>Your rank has increased!</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Character Feedback Section -->
+                    <div class="character-feedback">
+                        <div class="feedback-portrait" id="feedback-portrait"></div>
+                        <div class="feedback-message">
+                            <p id="feedback-text">Your journey in the shadows has been observed...</p>
+                            <div class="feedback-instruction">
+                                <i class="fas fa-info-circle"></i>
+                                <span>Check your Shinobi Stats to see your rank progression</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Results Actions -->
+                    <div class="results-actions">
+                        <button class="btn-ninja btn-stats" onclick="showStatsScreenFromResults()">
+                            <i class="fas fa-chart-line"></i>
+                            <span>VIEW STATS</span>
+                        </button>
+                        
+                        <button class="btn-ninja btn-retry" onclick="startGame()">
+                            <i class="fas fa-redo"></i>
+                            <span>ANOTHER TRIAL</span>
+                        </button>
+                        
+                        <button class="btn-ninja btn-menu-result" onclick="backToMenu()">
+                            <i class="fas fa-home"></i>
+                            <span>MAIN MENU</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="results-footer">
+                    <p>Your performance has been recorded in the Azuma scrolls</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="supporters.js"></script>
+    <script src="character-comments.js"></script>
+    <script src="game.js"></script>
+    <script src="vfx.js"></script>
+    
+    <script>
+        // Initialize game
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Tenchu Shiren - Initializing...');
+            
+            // Lock body scrolling
+            document.body.style.overflow = 'hidden';
+            document.documentElement.style.overflow = 'hidden';
+            
+            // Initialize VFX
+            if (typeof initVFX === 'function') {
+                initVFX();
             }
-            break;
-        }
-    }
-    
-    // Check if rank changed
-    rankChanged = (oldRank !== newRank);
-    
-    playerStats.currentRank = newRank;
-    playerStats.rankStars = newStars;
-    
-    // Update highest rank
-    const rankOrder = ["apprentice", "shinobi", "assassin", "ninja", "masterNinja", "grandMaster"];
-    const currentIndex = rankOrder.indexOf(newRank);
-    const highestIndex = rankOrder.indexOf(playerStats.highestRank);
-    if (currentIndex > highestIndex) {
-        playerStats.highestRank = newRank;
-    }
-    
-    console.log(`Player rank updated: ${newRank} (${newStars} stars)${rankChanged ? ' - RANK CHANGED!' : ''}`);
-    return rankChanged;
-}
-
-// Add score from current game
-function addGameScore(gameScore, correctCount, totalQuestions) {
-    const oldRank = playerStats.currentRank;
-    
-    playerStats.totalScore += gameScore;
-    playerStats.trialsCompleted++;
-    playerStats.totalCorrectAnswers += correctCount;
-    playerStats.totalQuestionsAnswered += totalQuestions;
-    
-    // Add coins
-    const coinsEarned = (correctCount * COINS_PER_CORRECT) + (correctCount === totalQuestions ? COINS_PER_GAME : 0);
-    playerStats.coins += coinsEarned;
-    
-    // Update rank
-    const rankChanged = updatePlayerRank();
-    
-    // Save stats
-    savePlayerStats();
-    
-    console.log(`Added game score: ${gameScore}. Total: ${playerStats.totalScore}. Coins: +${coinsEarned}`);
-    return { score: gameScore, coins: coinsEarned, rankChanged: rankChanged, oldRank: oldRank, newRank: playerStats.currentRank };
-}
-
-// Get stars display (☆ = empty, ★ = filled)
-function getStarsDisplay(stars) {
-    switch(stars) {
-        case 0: return "☆☆☆";
-        case 1: return "★☆☆";
-        case 2: return "★★☆";
-        case 3: return "★★★";
-        default: return "☆☆☆";
-    }
-}
-
-// Get rank display name
-function getRankDisplayName(rankKey) {
-    return rankRequirements[rankKey]?.displayName || "APPRENTICE";
-}
-
-// Get progress to next rank
-function getRankProgress() {
-    const currentRank = playerStats.currentRank;
-    const nextRank = rankRequirements[currentRank].nextRank;
-    
-    if (!nextRank) {
-        return { current: playerStats.totalScore, required: playerStats.totalScore, percent: 100 };
-    }
-    
-    const currentMin = rankRequirements[currentRank].minScore;
-    const nextMin = rankRequirements[nextRank].minScore;
-    const progress = playerStats.totalScore - currentMin;
-    const totalNeeded = nextMin - currentMin;
-    const percent = Math.min(100, Math.floor((progress / totalNeeded) * 100));
-    
-    return {
-        current: playerStats.totalScore,
-        required: nextMin,
-        percent: percent,
-        currentMin: currentMin,
-        nextMin: nextMin
-    };
-}
-
-// ==================== STATS SCREEN ====================
-
-// Update stats display
-function updateStatsDisplay() {
-    // Update player name
-    document.getElementById('stats-player-name').textContent = playerName.toUpperCase();
-    
-    // Update stats values
-    document.getElementById('stat-total-score').textContent = playerStats.totalScore;
-    document.getElementById('stat-trials-completed').textContent = playerStats.trialsCompleted;
-    document.getElementById('stat-coins').textContent = playerStats.coins;
-    
-    // Calculate success rate
-    const successRate = playerStats.totalQuestionsAnswered > 0 
-        ? Math.round((playerStats.totalCorrectAnswers / playerStats.totalQuestionsAnswered) * 100)
-        : 0;
-    document.getElementById('stat-success-rate').textContent = `${successRate}%`;
-    
-    // Update rank display
-    const rankName = getRankDisplayName(playerStats.currentRank);
-    document.getElementById('stat-rank-name').textContent = rankName;
-    
-    // Update stars
-    const starsDisplay = getStarsDisplay(playerStats.rankStars);
-    document.getElementById('stat-rank-stars').textContent = starsDisplay;
-    
-    // Update progress bar
-    const progress = getRankProgress();
-    document.getElementById('stat-rank-progress-text').textContent = `${progress.current}/${progress.required}`;
-    document.getElementById('stat-rank-progress').style.width = `${progress.percent}%`;
-    
-    // Set rank color
-    document.getElementById('stat-rank-name').style.color = rankColors[playerStats.currentRank] || "#808080";
-}
-
-// Share player stats
-function sharePlayerStats() {
-    const rankName = getRankDisplayName(playerStats.currentRank);
-    const stars = getStarsDisplay(playerStats.rankStars);
-    const successRate = playerStats.totalQuestionsAnswered > 0 
-        ? Math.round((playerStats.totalCorrectAnswers / playerStats.totalQuestionsAnswered) * 100)
-        : 0;
-    
-    const shareText = `🏯 Tenchu Shiren 天誅試練
-Rank: ${rankName} ${stars}
-Score: ${playerStats.totalScore} points
-Coins: ${playerStats.coins}
-Success Rate: ${successRate}%
-
-Can you beat my score?`;
-
-    const shareUrl = window.location.href;
-    
-    if (navigator.share) {
-        navigator.share({
-            title: 'My Tenchu Shiren Stats',
-            text: shareText,
-            url: shareUrl
-        }).then(() => {
-            console.log('Stats shared successfully');
-        }).catch(err => {
-            console.log('Error sharing:', err);
-            fallbackShare(shareText);
-        });
-    } else {
-        fallbackShare(shareText);
-    }
-}
-
-// Fallback share method
-function fallbackShare(shareText) {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(shareText).then(() => {
-            alert('Stats copied to clipboard! Share it with your fellow shinobi.');
-        }).catch(err => {
-            console.error('Failed to copy:', err);
-            alert('Share this text:\n\n' + shareText);
-        });
-    } else {
-        const textArea = document.createElement('textarea');
-        textArea.value = shareText;
-        document.body.appendChild(textArea);
-        textArea.select();
-        try {
-            document.execCommand('copy');
-            alert('Stats copied to clipboard! Share it with your fellow shinobi.');
-        } catch (err) {
-            alert('Share this text:\n\n' + shareText);
-        }
-        document.body.removeChild(textArea);
-    }
-}
-
-// ==================== SCREEN MANAGEMENT ====================
-
-// Show screen with transition effects
-function showScreen(screenId) {
-    if (typeof createGameVFX === 'function' && currentScreen !== screenId) {
-        createGameVFX('screenChange');
-    }
-    
-    // Hide all screens
-    const screens = document.querySelectorAll('.screen');
-    screens.forEach(screen => {
-        screen.classList.remove('active');
-        setTimeout(() => {
-            screen.classList.add('hidden');
-        }, 50);
-    });
-    
-    // Show requested screen
-    const screen = document.getElementById(screenId);
-    if (screen) {
-        screen.classList.remove('hidden');
-        setTimeout(() => {
-            screen.classList.add('active');
-        }, 100);
-        
-        currentScreen = screenId;
-        console.log(`Showing screen: ${screenId}`);
-    }
-}
-
-// ==================== GAME FUNCTIONS ====================
-
-function setPlayerName() {
-    const input = document.getElementById('player-name-input');
-    if (input && input.value.trim() !== '') {
-        playerName = input.value.trim();
-        console.log(`Player name: ${playerName}`);
-        savePlayerStats();
-    }
-    
-    startGame();
-}
-
-async function startGame() {
-    console.log("Starting game...");
-    
-    // Reset game state
-    currentQuestionIndex = 0;
-    correctAnswers = 0;
-    gameActive = true;
-    playerAnswers = [];
-    showAppreciation = false;
-    
-    // Load questions
-    await loadQuestions();
-    
-    // Show game screen
-    showScreen('game');
-    showGameScreen('question');
-    
-    // Update player display
-    document.getElementById('current-player').textContent = playerName.toUpperCase();
-    
-    // Create game start VFX
-    if (typeof createGameVFX === 'function') {
-        createGameVFX('gameStart');
-    }
-    
-    // Load first question with delay for transition
-    setTimeout(() => {
-        loadQuestion();
-    }, 500);
-}
-
-// Show specific screen within game with transition
-function showGameScreen(screenType) {
-    const screens = ['question-screen', 'appreciation-screen', 'result-screen'];
-    
-    // Hide all game screens with fade out
-    screens.forEach(screenId => {
-        const screen = document.getElementById(screenId);
-        if (screen && screen.classList.contains('active')) {
-            screen.classList.remove('active');
-            setTimeout(() => {
-                screen.classList.add('hidden');
-            }, 300);
-        }
-    });
-    
-    // Show requested screen with fade in
-    let screenToShow;
-    switch(screenType) {
-        case 'question':
-            screenToShow = 'question-screen';
-            break;
-        case 'appreciation':
-            screenToShow = 'appreciation-screen';
-            break;
-        case 'results':
-            screenToShow = 'result-screen';
-            break;
-    }
-    
-    const screen = document.getElementById(screenToShow);
-    if (screen) {
-        screen.classList.remove('hidden');
-        setTimeout(() => {
-            screen.classList.add('active');
-            screen.classList.add('question-transition');
             
-            setTimeout(() => {
-                screen.classList.remove('question-transition');
-            }, 500);
-        }, 50);
-    }
-}
-
-async function loadQuestions() {
-    try {
-        const response = await fetch('questions.json');
-        if (response.ok) {
-            const data = await response.json();
-            questions = data.sort(() => Math.random() - 0.5).slice(0, 5);
-            console.log(`Loaded ${questions.length} questions`);
-        } else {
-            throw new Error('Failed to load questions.json');
-        }
-    } catch (error) {
-        console.error("Error loading questions:", error);
-        alert("Failed to load questions. Please check questions.json file.");
-        backToMenu();
-        return;
-    }
-}
-
-function loadQuestion() {
-    if (!gameActive) return;
-    
-    // Check if all questions are answered
-    if (currentQuestionIndex >= questions.length) {
-        showAppreciation = Math.random() < 0.4;
-        
-        if (showAppreciation && typeof supporters !== 'undefined' && supporters.length > 0) {
-            showAppreciationScreen();
-        } else {
-            showResults();
-        }
-        return;
-    }
-    
-    const question = questions[currentQuestionIndex];
-    
-    // Update UI with transition
-    const questionText = document.getElementById('question-text');
-    questionText.style.opacity = '0';
-    
-    setTimeout(() => {
-        questionText.textContent = question.question;
-        questionText.style.opacity = '1';
-        
-        // Update other UI elements
-        document.getElementById('trial-number').textContent = currentQuestionIndex + 1;
-        document.getElementById('current-trial').textContent = currentQuestionIndex + 1;
-        document.getElementById('progress-current').textContent = currentQuestionIndex + 1;
-        
-        // Update progress bar
-        const progressPercentage = (currentQuestionIndex / questions.length) * 100;
-        document.getElementById('progress-fill').style.width = `${progressPercentage}%`;
-        
-        // Update difficulty display
-        const diffElement = document.querySelector('.diff-level');
-        if (diffElement && question.difficulty) {
-            diffElement.textContent = question.difficulty;
-        }
-        
-        // Create options
-        createOptions(question);
-        
-    }, 300);
-    
-    showGameScreen('question');
-}
-
-function createOptions(question) {
-    const optionsDiv = document.getElementById('options');
-    optionsDiv.innerHTML = '';
-    
-    question.options.forEach((option, index) => {
-        const button = document.createElement('button');
-        button.className = 'btn-ninja';
-        button.innerHTML = `
-            <span class="option-letter">${String.fromCharCode(65 + index)}</span>
-            <span class="option-text">${option}</span>
-        `;
-        
-        button.onclick = () => {
-            button.classList.add('option-selected');
+            // Initialize supporters list
+            if (typeof updateSupportersList === 'function') {
+                updateSupportersList();
+            }
             
-            const allButtons = optionsDiv.querySelectorAll('button');
-            allButtons.forEach(btn => {
-                btn.disabled = true;
-                btn.style.pointerEvents = 'none';
-                btn.style.opacity = '0.6';
+            // Setup name input
+            const nameInput = document.getElementById('player-name-input');
+            if (nameInput) {
+                nameInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        setPlayerName();
+                    }
+                });
+                
+                // Focus on input when screen shows
+                nameInput.addEventListener('focus', function() {
+                    setTimeout(() => {
+                        this.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }, 300);
+                });
+            }
+            
+            // Prevent touch scrolling on body
+            document.addEventListener('touchmove', function(e) {
+                const scrollableContainers = ['.screen-content', '.question-container', '.supporters-scroll', '.appreciation-container', '.results-container', '.missions-coming-soon'];
+                let isScrollable = false;
+                
+                for (let selector of scrollableContainers) {
+                    if (e.target.closest(selector)) {
+                        isScrollable = true;
+                        break;
+                    }
+                }
+                
+                if (!isScrollable) {
+                    e.preventDefault();
+                }
+            }, { passive: false });
+            
+            // Handle viewport height for mobile
+            function setVH() {
+                const vh = window.innerHeight * 0.01;
+                document.documentElement.style.setProperty('--vh', `${vh}px`);
+                
+                const screens = document.querySelectorAll('.screen');
+                screens.forEach(screen => {
+                    screen.style.height = `${window.innerHeight * 0.85}px`;
+                    screen.style.maxHeight = `${window.innerHeight * 0.85}px`;
+                });
+            }
+            
+            setVH();
+            window.addEventListener('resize', setVH);
+            window.addEventListener('orientationchange', function() {
+                setTimeout(setVH, 100);
             });
             
-            button.style.background = 'linear-gradient(145deg, #2a1a1a, #1a1111)';
-            button.style.borderColor = '#8b0000';
+            // Load player stats if available
+            if (typeof loadPlayerStats === 'function') {
+                loadPlayerStats();
+            }
             
-            setTimeout(() => {
-                checkAnswer(option, question.answer, question.commentator);
-            }, 300);
-        };
-        
-        optionsDiv.appendChild(button);
-    });
-}
-
-function checkAnswer(selected, correct, commentator) {
-    const isCorrect = selected === correct;
-    
-    playerAnswers.push({
-        selected: selected,
-        correct: correct,
-        isCorrect: isCorrect,
-        commentator: commentator
-    });
-    
-    if (isCorrect) {
-        correctAnswers++;
-        if (typeof createGameVFX === 'function') {
-            createGameVFX('correct');
-        }
-        highlightAnswerFeedback(true);
-    } else {
-        if (typeof createGameVFX === 'function') {
-            createGameVFX('incorrect');
-        }
-        highlightAnswerFeedback(false);
-    }
-    
-    setTimeout(() => {
-        currentQuestionIndex++;
-        loadQuestion();
-    }, 1500);
-}
-
-function highlightAnswerFeedback(isCorrect) {
-    const options = document.querySelectorAll('#options .btn-ninja');
-    options.forEach(button => {
-        const optionText = button.querySelector('.option-text').textContent;
-        button.style.transition = 'all 0.5s ease';
-        
-        if (isCorrect && optionText === questions[currentQuestionIndex].answer) {
-            button.style.background = 'linear-gradient(145deg, #1a2a1a, #111a11)';
-            button.style.borderColor = '#00aa00';
-            button.style.color = '#00ff00';
-        } else if (!isCorrect) {
-            if (optionText === questions[currentQuestionIndex].answer) {
-                button.style.background = 'linear-gradient(145deg, #1a2a1a, #111a11)';
-                button.style.borderColor = '#00aa00';
-                button.style.color = '#00ff00';
-            }
-            else if (optionText === playerAnswers[playerAnswers.length - 1].selected) {
-                button.style.background = 'linear-gradient(145deg, #2a1a1a, #1a1111)';
-                button.style.borderColor = '#ff0000';
-                button.style.color = '#ff6666';
-            }
-        }
-    });
-}
-
-// ==================== APPRECIATION SCREEN ====================
-
-function showAppreciationScreen() {
-    if (typeof supporters === 'undefined' || supporters.length === 0) {
-        showResults();
-        return;
-    }
-    
-    const randomIndex = Math.floor(Math.random() * supporters.length);
-    const supporter = supporters[randomIndex];
-    
-    const characters = ['rikimaru', 'ayame', 'tatsumaru'];
-    const randomCharacter = characters[Math.floor(Math.random() * characters.length)];
-    
-    let portrait = '';
-    if (typeof getCharacterPortrait === 'function') {
-        portrait = getCharacterPortrait(randomCharacter);
-    }
-    
-    let characterName = "Azuma Master";
-    if (typeof getCharacterDisplayName === 'function') {
-        characterName = getCharacterDisplayName(randomCharacter);
-    }
-    
-    const messages = [
-        `${characterName} acknowledges your support.`,
-        `${characterName} honors those who stand with the Azuma.`,
-        `From the shadows, ${characterName} gives thanks.`,
-        `${characterName} recognizes true allies of the clan.`
-    ];
-    
-    const randomMessage = messages[Math.floor(Math.random() * messages.length)];
-    
-    document.getElementById('appreciation-text').textContent = randomMessage;
-    document.getElementById('honored-name').textContent = supporter.name;
-    document.getElementById('honored-handle').textContent = supporter.handle || '';
-    
-    const supporterRank = document.querySelector('.supporter-rank');
-    if (supporterRank && supporter.rank) {
-        // Use the local function from supporters.js
-        if (typeof getRankInfo === 'function') {
-            const rankInfo = getRankInfo(supporter.rank);
-            if (rankInfo) {
-                supporterRank.innerHTML = `
-                    <i class="fas fa-shield-alt"></i>
-                    <span>${rankInfo.name}</span>
-                `;
-            }
-        } else {
-            // Fallback if function not available
-            supporterRank.innerHTML = `
-                <i class="fas fa-shield-alt"></i>
-                <span>HONORED ALLY</span>
-            `;
-        }
-    }
-    
-    if (portrait) {
-        document.getElementById('appreciation-portrait').style.backgroundImage = `url('${portrait}')`;
-    }
-    
-    showGameScreen('appreciation');
-    
-    if (typeof createGameVFX === 'function') {
-        createGameVFX('appreciation');
-    }
-    
-    console.log(`Showing appreciation for supporter: ${supporter.name}`);
-}
-
-// ==================== UPDATED RESULTS SCREEN (SCORE-BASED) ====================
-
-function showResults() {
-    const totalQuestions = questions.length;
-    const percentage = Math.round((correctAnswers / totalQuestions) * 100);
-    
-    // Calculate points earned
-    const pointsEarned = (correctAnswers * POINTS_PER_CORRECT) + (correctAnswers === totalQuestions ? POINTS_PER_GAME_COMPLETION : 0);
-    
-    // Add to player progression
-    const gameResult = addGameScore(pointsEarned, correctAnswers, totalQuestions);
-    
-    // Update results screen with animations
-    updateResultsDisplay(pointsEarned, gameResult.coins, totalQuestions, correctAnswers, percentage, gameResult);
-    
-    // Show results screen
-    showGameScreen('results');
-    
-    // Create VFX based on performance
-    if (typeof createGameVFX === 'function') {
-        if (percentage >= 50) {
-            createGameVFX('victory');
-        } else {
-            createGameVFX('defeat');
-        }
-    }
-    
-    console.log(`Game completed. Correct: ${correctAnswers}/${totalQuestions} (${percentage}%). Points: +${pointsEarned}. Rank changed: ${gameResult.rankChanged}`);
-}
-
-function updateResultsDisplay(pointsEarned, coinsEarned, totalQuestions, correctAnswers, percentage, gameResult) {
-    // Update score breakdown
-    document.getElementById('result-correct').textContent = `${correctAnswers}/${totalQuestions}`;
-    document.getElementById('result-points').textContent = `+${pointsEarned}`;
-    document.getElementById('result-coins').textContent = `+${coinsEarned}`;
-    
-    // Calculate and animate total score
-    const oldTotalScore = playerStats.totalScore - pointsEarned;
-    const newTotalScore = playerStats.totalScore;
-    
-    // Animate the total score counting up
-    animateValue('result-total', oldTotalScore, newTotalScore, 1500);
-    
-    // Show rank notification if rank changed
-    const rankNotification = document.getElementById('rank-notification');
-    if (gameResult.rankChanged) {
-        rankNotification.style.display = 'flex';
-        rankNotification.innerHTML = `
-            <i class="fas fa-arrow-up"></i>
-            <span>Rank Up! ${getRankDisplayName(gameResult.oldRank)} → ${getRankDisplayName(gameResult.newRank)}</span>
-        `;
-        
-        // Add celebration effect
-        if (typeof createGameVFX === 'function') {
-            setTimeout(() => {
-                createGameVFX('victory');
-            }, 500);
-        }
-    } else {
-        rankNotification.style.display = 'none';
-    }
-    
-    // Get character feedback based on performance
-    let feedbackCharacter;
-    let feedbackMessage = "";
-    
-    // Determine which character gives feedback based on percentage
-    if (percentage >= 80) {
-        feedbackCharacter = 'rikimaru';
-    } else if (percentage >= 60) {
-        feedbackCharacter = 'ayame';
-    } else {
-        feedbackCharacter = 'tatsumaru';
-    }
-    
-    // Get appropriate feedback message
-    feedbackMessage = getPerformanceFeedback(feedbackCharacter, percentage, correctAnswers, totalQuestions);
-    
-    // Update feedback
-    document.getElementById('feedback-text').textContent = feedbackMessage;
-    
-    // Set character portrait
-    if (typeof getCharacterPortrait === 'function') {
-        const portrait = getCharacterPortrait(feedbackCharacter);
-        if (portrait) {
-            document.getElementById('feedback-portrait').style.backgroundImage = `url('${portrait}')`;
-        }
-    }
-}
-
-// Animate number counting up
-function animateValue(elementId, start, end, duration) {
-    const element = document.getElementById(elementId);
-    if (!element) return;
-    
-    const range = end - start;
-    const startTime = performance.now();
-    
-    function update(currentTime) {
-        const elapsed = currentTime - startTime;
-        const progress = Math.min(elapsed / duration, 1);
-        
-        // Easing function for smooth animation
-        const easeProgress = progress < 0.5 
-            ? 2 * progress * progress 
-            : 1 - Math.pow(-2 * progress + 2, 2) / 2;
-        
-        const currentValue = Math.floor(start + (range * easeProgress));
-        element.textContent = currentValue;
-        
-        if (progress < 1) {
-            requestAnimationFrame(update);
-        } else {
-            element.textContent = end;
-        }
-    }
-    
-    requestAnimationFrame(update);
-}
-
-// Get performance feedback from characters
-function getPerformanceFeedback(character, percentage, correct, total) {
-    const characterName = typeof getCharacterDisplayName === 'function' 
-        ? getCharacterDisplayName(character) 
-        : "Master";
-    
-    if (character === 'rikimaru') {
-        if (percentage >= 80) {
-            return "Your precision is commendable. Continue to hone your skills in the shadows.";
-        } else if (percentage >= 60) {
-            return "Acceptable performance. Focus on improving your judgment.";
-        } else {
-            return "Your technique needs refinement. Study the ancient scrolls.";
-        }
-    }
-    
-    if (character === 'ayame') {
-        if (percentage >= 80) {
-            return "Well done! Your intuition serves you well in the shadows!";
-        } else if (percentage >= 60) {
-            return "Good effort! Remember, a true kunoichi relies on both skill and wit!";
-        } else {
-            return "You need more practice! Don't lose heart - every master was once a beginner!";
-        }
-    }
-    
-    if (character === 'tatsumaru') {
-        if (percentage >= 80) {
-            return "Hmph. Not bad. You understand that strength comes from knowledge.";
-        } else if (percentage >= 60) {
-            return "Adequate. But true power requires perfection.";
-        } else {
-            return "Weak. The shadows have no mercy for the unprepared.";
-        }
-    }
-    
-    return "The trial is complete. Your performance has been recorded.";
-}
-
-// ==================== MENU FUNCTIONS ====================
-
-function showPlayerNameScreen() {
-    showScreen('player-name-screen');
-    document.getElementById('player-name-input').focus();
-}
-
-function showInfo() {
-    showScreen('info');
-}
-
-function showSupporters() {
-    showScreen('supporters-screen');
-    
-    const messageEl = document.getElementById('supporter-message');
-    if (messageEl && typeof getSupporterAppreciation === 'function') {
-        messageEl.textContent = getSupporterAppreciation();
-    }
-}
-
-function showStatsScreen() {
-    showScreen('stats-screen');
-    updateStatsDisplay();
-}
-
-function showMissionsScreen() {
-    showScreen('missions-screen');
-}
-
-function showStatsScreenFromResults() {
-    showScreen('stats-screen');
-    updateStatsDisplay();
-}
-
-function backToMenu() {
-    showScreen('menu');
-    gameActive = false;
-    
-    if (typeof createGameVFX === 'function') {
-        createGameVFX('menuOpen');
-    }
-}
-
-// ==================== INITIALIZATION ====================
-
-// Wait for all scripts to load before showing menu
-function initializeGame() {
-    console.log('Tenchu Shiren - Score-Based Edition');
-    
-    if (typeof initVFX === 'function') {
-        initVFX();
-    }
-    
-    loadPlayerStats();
-    
-    // Wait a bit to ensure DOM is fully ready
-    setTimeout(() => {
-        showScreen('menu');
-    }, 100);
-    
-    if (typeof updateSupportersList === 'function') {
-        updateSupportersList();
-    }
-    
-    const nameInput = document.getElementById('player-name-input');
-    if (nameInput) {
-        nameInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                setPlayerName();
-            }
+            console.log('Game initialized successfully');
         });
         
-        if (playerName !== "Nameless Warrior") {
-            nameInput.value = playerName;
+        // New screen functions
+        function showStatsScreen() {
+            showScreen('stats-screen');
+            if (typeof updateStatsDisplay === 'function') {
+                updateStatsDisplay();
+            }
         }
-    }
-    
-    window.addEventListener('popstate', function() {
-        if (currentScreen === 'game' && gameActive) {
-            backToMenu();
+        
+        function showMissionsScreen() {
+            showScreen('missions-screen');
         }
-    });
-    
-    if (window.innerWidth >= 1024) {
-        document.body.classList.add('fullscreen-enabled');
-    }
-    
-    console.log('Score-based game initialized successfully');
-}
-
-// Initialize when DOM is ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeGame);
-} else {
-    initializeGame();
-}
-
-// ==================== GLOBAL EXPORTS ====================
-
-window.showPlayerNameScreen = showPlayerNameScreen;
-window.showInfo = showInfo;
-window.showSupporters = showSupporters;
-window.showStatsScreen = showStatsScreen;
-window.showMissionsScreen = showMissionsScreen;
-window.showStatsScreenFromResults = showStatsScreenFromResults;
-window.backToMenu = backToMenu;
-window.setPlayerName = setPlayerName;
-window.startGame = startGame;
-window.showResults = showResults;
-window.sharePlayerStats = sharePlayerStats;
-window.updateStatsDisplay = updateStatsDisplay;
-window.loadPlayerStats = loadPlayerStats;
-window.savePlayerStats = savePlayerStats;
+        
+        function showStatsScreenFromResults() {
+            showScreen('stats-screen');
+            if (typeof updateStatsDisplay === 'function') {
+                updateStatsDisplay();
+            }
+        }
+        
+        function shareStats() {
+            if (typeof sharePlayerStats === 'function') {
+                sharePlayerStats();
+            } else {
+                const rank = document.getElementById('stat-rank-name').textContent;
+                const stars = document.getElementById('stat-rank-stars').textContent;
+                const text = `I achieved ${rank} ${stars} in Tenchu Shiren! 天誅試練`;
+                
+                if (navigator.share) {
+                    navigator.share({
+                        title: 'Tenchu Shiren - My Shinobi Rank',
+                        text: text,
+                        url: window.location.href
+                    });
+                } else {
+                    navigator.clipboard.writeText(text).then(() => {
+                        alert('Rank copied to clipboard!');
+                    });
+                }
+            }
+        }
+    </script>
+</body>
+</html>
