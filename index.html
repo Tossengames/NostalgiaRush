@@ -307,47 +307,84 @@
         </div>
         
         <div class="screen-content">
-            <div class="missions-coming-soon">
-                <div class="coming-soon-icon">
-                    <i class="fas fa-hourglass"></i>
-                </div>
-                <h3>UNDER DEVELOPMENT</h3>
-                <p class="coming-soon-text">
-                    The Azuma clan is preparing special operations for elite shinobi.
-                    New missions will be available soon.
-                </p>
-                <p class="coming-soon-details">
-                    Future missions will challenge your skills with unique objectives,
-                    valuable rewards, and opportunities to earn Shinobi Coins.
-                </p>
-                
-                <div class="missions-preview">
-                    <div class="mission-preview-item">
-                        <i class="fas fa-user-secret"></i>
-                        <span>Stealth Infiltration</span>
-                    </div>
-                    <div class="mission-preview-item">
-                        <i class="fas fa-skull-crossbones"></i>
-                        <span>Target Elimination</span>
-                    </div>
-                    <div class="mission-preview-item">
-                        <i class="fas fa-scroll"></i>
-                        <span>Intel Gathering</span>
-                    </div>
-                </div>
+            <div id="missions-list">
+                <!-- Missions content loaded by JavaScript -->
             </div>
-            
-            <div class="missions-footer">
-                <button class="btn-ninja btn-back" onclick="backToMenu()">
-                    <i class="fas fa-arrow-left"></i>
-                    <span>RETURN TO MENU</span>
-                </button>
+        </div>
+    </div>
+
+    <!-- ==================== MISSION SCREENS ==================== -->
+
+    <!-- Mission Briefing Screen -->
+    <div id="mission-briefing-screen" class="screen hidden">
+        <div class="screen-header">
+            <h2><i class="fas fa-scroll"></i> MISSION BRIEFING</h2>
+            <div class="subtitle">Azuma Clan Operation Details</div>
+        </div>
+        <div class="screen-content">
+            <div id="briefing-content">
+                <!-- Content loaded by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Mission Items Screen -->
+    <div id="mission-items-screen" class="screen hidden">
+        <div class="screen-header">
+            <h2><i class="fas fa-tools"></i> EQUIPMENT SELECTION</h2>
+            <div class="subtitle">Choose Your Tools Wisely</div>
+        </div>
+        <div class="screen-content">
+            <div id="items-content">
+                <!-- Content loaded by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Mission Game Screen -->
+    <div id="mission-game-screen" class="screen hidden">
+        <div class="screen-header">
+            <h2><i class="fas fa-user-secret"></i> MISSION IN PROGRESS</h2>
+            <div class="subtitle">Move Like a Shadow</div>
+        </div>
+        <div class="screen-content">
+            <div id="mission-game-content">
+                <!-- Content loaded by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Mission End Screen -->
+    <div id="mission-end-screen" class="screen hidden">
+        <div class="screen-header">
+            <h2><i class="fas fa-flag-checkered"></i> MISSION COMPLETE</h2>
+            <div class="subtitle">The Shadows Remember</div>
+        </div>
+        <div class="screen-content">
+            <div id="mission-end-content">
+                <!-- Content loaded by JavaScript -->
             </div>
         </div>
     </div>
 
     <!-- Game Screen -->
     <div id="game" class="screen hidden game-screen">
+        <!-- ALWAYS VISIBLE STATS -->
+        <div class="game-stats-header">
+            <div class="game-stat-item">
+                <div class="stat-label">SCORE</div>
+                <div class="stat-value" id="live-score">0</div>
+            </div>
+            <div class="game-stat-item">
+                <div class="stat-label">COINS</div>
+                <div class="stat-value" id="live-coins">0</div>
+            </div>
+            <div class="game-stat-item">
+                <div class="stat-label">RANK</div>
+                <div class="stat-value" id="live-rank">APPRENTICE</div>
+            </div>
+        </div>
+        
         <!-- Question Screen -->
         <div id="question-screen" class="game-content active">
             <div class="game-header">
@@ -497,6 +534,7 @@
     <script src="supporters.js"></script>
     <script src="character-comments.js"></script>
     <script src="game.js"></script>
+    <script src="missions.js"></script>
     <script src="vfx.js"></script>
     
     <script>
@@ -518,6 +556,11 @@
                 updateSupportersList();
             }
             
+            // Initialize missions system
+            if (typeof initializeMissions === 'function') {
+                initializeMissions();
+            }
+            
             // Setup name input
             const nameInput = document.getElementById('player-name-input');
             if (nameInput) {
@@ -537,7 +580,7 @@
             
             // Prevent touch scrolling on body
             document.addEventListener('touchmove', function(e) {
-                const scrollableContainers = ['.screen-content', '.question-container', '.supporters-scroll', '.appreciation-container', '.results-container', '.missions-coming-soon'];
+                const scrollableContainers = ['.screen-content', '.question-container', '.supporters-scroll', '.appreciation-container', '.results-container', '.missions-intro', '.briefing-content', '.items-content', '.mission-game-content', '.mission-end-content'];
                 let isScrollable = false;
                 
                 for (let selector of scrollableContainers) {
@@ -575,7 +618,12 @@
                 loadPlayerStats();
             }
             
-            console.log('Game initialized successfully');
+            // Initialize live stats display
+            if (typeof updateLiveStats === 'function') {
+                updateLiveStats();
+            }
+            
+            console.log('Game initialized successfully with missions system');
         });
         
         // New screen functions
@@ -588,6 +636,9 @@
         
         function showMissionsScreen() {
             showScreen('missions-screen');
+            if (typeof updateMissionsList === 'function') {
+                updateMissionsList();
+            }
         }
         
         function showStatsScreenFromResults() {
