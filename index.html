@@ -310,6 +310,14 @@
             <div id="missions-list">
                 <!-- Missions content loaded by JavaScript -->
             </div>
+            
+            <!-- ADDED BACK BUTTON -->
+            <div class="missions-footer">
+                <button class="btn-ninja btn-back" onclick="backToMenu()">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>RETURN TO MENU</span>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -369,22 +377,6 @@
 
     <!-- Game Screen -->
     <div id="game" class="screen hidden game-screen">
-        <!-- ALWAYS VISIBLE STATS -->
-        <div class="game-stats-header">
-            <div class="game-stat-item">
-                <div class="stat-label">SCORE</div>
-                <div class="stat-value" id="live-score">0</div>
-            </div>
-            <div class="game-stat-item">
-                <div class="stat-label">COINS</div>
-                <div class="stat-value" id="live-coins">0</div>
-            </div>
-            <div class="game-stat-item">
-                <div class="stat-label">RANK</div>
-                <div class="stat-value" id="live-rank">APPRENTICE</div>
-            </div>
-        </div>
-        
         <!-- Question Screen -->
         <div id="question-screen" class="game-content active">
             <div class="game-header">
@@ -616,11 +608,6 @@
             // Load player stats if available
             if (typeof loadPlayerStats === 'function') {
                 loadPlayerStats();
-            }
-            
-            // Initialize live stats display
-            if (typeof updateLiveStats === 'function') {
-                updateLiveStats();
             }
             
             console.log('Game initialized successfully with missions system');
