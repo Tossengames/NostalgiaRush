@@ -1,17 +1,16 @@
-// ============================================
-// TENCHU SHIREN - COMPLETE GAME ENGINE
-// ============================================
+/**
+ * TENCHU SHIREN - Master Game Engine
+ * Synchronized with index.html
+ */
 
-// Game state
+// --- Global State ---
 let playerName = "Nameless Warrior";
 let currentQuestionIndex = 0;
 let questions = [];
 let gameActive = false;
 let correctAnswers = 0;
 let playerAnswers = [];
-let showAppreciation = false;
 
-// Player progression system
 let playerStats = {
     totalScore: 0,
     trialsCompleted: 0,
@@ -20,35 +19,34 @@ let playerStats = {
     currentRank: "apprentice",
     rankStars: 0,
     coins: 0,
-    lastPlayed: null,
-    highestRank: "apprentice"
+    lastPlayed: null
 };
 
-// Rank requirements matching your HTML/Stats
 const rankRequirements = {
-    "apprentice": { minScore: 0, stars: 3, nextRank: "shinobi", displayName: "APPRENTICE" },
-    "shinobi": { minScore: 100, stars: 3, nextRank: "assassin", displayName: "SHINOBI" },
-    "assassin": { minScore: 300, stars: 3, nextRank: "ninja", displayName: "ASSASSIN" },
-    "ninja": { minScore: 600, stars: 3, nextRank: "masterNinja", displayName: "NINJA" },
-    "masterNinja": { minScore: 1000, stars: 3, nextRank: "grandMaster", displayName: "MASTER NINJA" },
-    "grandMaster": { minScore: 2000, stars: 3, nextRank: null, displayName: "GRAND MASTER" }
+    "apprentice": { minScore: 0, displayName: "APPRENTICE", nextRank: "shinobi" },
+    "shinobi": { minScore: 100, displayName: "SHINOBI", nextRank: "assassin" },
+    "assassin": { minScore: 300, displayName: "ASSASSIN", nextRank: "ninja" },
+    "ninja": { minScore: 600, displayName: "NINJA", nextRank: "masterNinja" },
+    "masterNinja": { minScore: 1000, displayName: "MASTER NINJA", nextRank: "grandMaster" },
+    "grandMaster": { minScore: 2000, displayName: "GRAND MASTER", nextRank: null }
 };
 
 const POINTS_PER_CORRECT = 20;
-const POINTS_PER_GAME_COMPLETION = 50;
+const COMPLETION_BONUS = 50;
 const COINS_PER_CORRECT = 2;
-const COINS_PER_GAME = 10;
-let currentScreen = 'menu';
 
-// ==================== INITIALIZATION & PERSISTENCE ====================
+// --- Initialization ---
+window.addEventListener('load', () => {
+    loadPlayerStats();
+    // Set viewport height for mobile
+    const vh = window.innerHeight * 0.01;
+    document.documentElement.style.setProperty('--vh', `${vh}px`);
+});
 
 function loadPlayerStats() {
     try {
         const saved = localStorage.getItem('tenchuShirenStats');
-        if (saved) {
-            const parsed = JSON.parse(saved);
-            playerStats = { ...playerStats, ...parsed };
-        }
+        if (saved) playerStats = { ...playerStats, ...JSON.parse(saved) };
         
         const savedName = localStorage.getItem('tenchuShirenPlayerName');
         if (savedName) {
@@ -56,723 +54,230 @@ function loadPlayerStats() {
             const input = document.getElementById('player-name-input');
             if (input) input.value = playerName;
         }
-    } catch (error) {
-        console.error("Error loading stats:", error);
-    }
+    } catch (e) { console.error("Stats load failed", e); }
 }
 
 function savePlayerStats() {
-    try {
-        playerStats.lastPlayed = new Date().toISOString();
-        localStorage.setItem('tenchuShirenStats', JSON.stringify(playerStats));
-        localStorage.setItem('tenchuShirenPlayerName', playerName);
-    } catch (error) {
-        console.error("Error saving stats:", error);
-    }
+    localStorage.setItem('tenchuShirenStats', JSON.stringify(playerStats));
+    localStorage.setItem('tenchuShirenPlayerName', playerName);
 }
 
-// Update player rank based on total score
-function updatePlayerRank() {
-    const ranks = Object.keys(rankRequirements);
-    let newRank = "apprentice";
-    let newStars = 0;
-    let rankChanged = false;
-    const oldRank = playerStats.currentRank;
-    
-    // Find current rank based on score
-    for (let i = ranks.length - 1; i >= 0; i--) {
-        const rank = ranks[i];
-        if (playerStats.totalScore >= rankRequirements[rank].minScore) {
-            newRank = rank;
-            
-            // Calculate stars within this rank
-            const nextRank = rankRequirements[rank].nextRank;
-            if (nextRank) {
-                const currentMin = rankRequirements[rank].minScore;
-                const nextMin = rankRequirements[nextRank].minScore;
-                const progress = playerStats.totalScore - currentMin;
-                const totalRange = nextMin - currentMin;
-                const starProgress = (progress / totalRange) * 3;
-                newStars = Math.min(2, Math.floor(starProgress));
-            } else {
-                // For grand master, show full stars
-                newStars = 2;
-            }
-            break;
-        }
-    }
-    
-    // Check if rank changed
-    rankChanged = (oldRank !== newRank);
-    
-    playerStats.currentRank = newRank;
-    playerStats.rankStars = newStars;
-    
-    // Update highest rank
-    const rankOrder = ["apprentice", "shinobi", "assassin", "ninja", "masterNinja", "grandMaster"];
-    const currentIndex = rankOrder.indexOf(newRank);
-    const highestIndex = rankOrder.indexOf(playerStats.highestRank);
-    if (currentIndex > highestIndex) {
-        playerStats.highestRank = newRank;
-    }
-    
-    return rankChanged;
-}
-
-// Add score from current game
-function addGameScore(gameScore, correctCount, totalQuestions) {
-    const oldRank = playerStats.currentRank;
-    
-    playerStats.totalScore += gameScore;
-    playerStats.trialsCompleted++;
-    playerStats.totalCorrectAnswers += correctCount;
-    playerStats.totalQuestionsAnswered += totalQuestions;
-    
-    // Add coins
-    const coinsEarned = (correctCount * COINS_PER_CORRECT) + (correctCount === totalQuestions ? COINS_PER_GAME : 0);
-    playerStats.coins += coinsEarned;
-    
-    // Update rank
-    const rankChanged = updatePlayerRank();
-    
-    // Save stats
-    savePlayerStats();
-    
-    return { score: gameScore, coins: coinsEarned, rankChanged: rankChanged, oldRank: oldRank, newRank: playerStats.currentRank };
-}
-
-// Get stars display (☆ = empty, ★ = filled)
-function getStarsDisplay(stars) {
-    switch(stars) {
-        case 0: return "☆☆☆";
-        case 1: return "★☆☆";
-        case 2: return "★★☆";
-        case 3: return "★★★";
-        default: return "☆☆☆";
-    }
-}
-
-// Get progress to next rank
-function getRankProgress() {
-    const currentRank = playerStats.currentRank;
-    const nextRank = rankRequirements[currentRank].nextRank;
-    
-    if (!nextRank) {
-        return { current: playerStats.totalScore, required: playerStats.totalScore, percent: 100 };
-    }
-    
-    const currentMin = rankRequirements[currentRank].minScore;
-    const nextMin = rankRequirements[nextRank].minScore;
-    const progress = playerStats.totalScore - currentMin;
-    const totalNeeded = nextMin - currentMin;
-    const percent = Math.min(100, Math.floor((progress / totalNeeded) * 100));
-    
-    return {
-        current: playerStats.totalScore,
-        required: nextMin,
-        percent: percent,
-        currentMin: currentMin,
-        nextMin: nextMin
-    };
-}
-
-// ==================== SCREEN NAVIGATION ====================
-
+// --- Navigation ---
 function showScreen(screenId) {
-    const screens = document.querySelectorAll('.screen');
-    screens.forEach(screen => {
-        screen.classList.remove('active');
-        screen.classList.add('hidden');
+    document.querySelectorAll('.screen').forEach(s => {
+        s.classList.remove('active');
+        s.classList.add('hidden');
     });
-    
     const target = document.getElementById(screenId);
     if (target) {
         target.classList.remove('hidden');
-        // Small delay to allow CSS transitions
         setTimeout(() => target.classList.add('active'), 50);
-        currentScreen = screenId;
     }
+}
+
+function showGameSubScreen(type) {
+    const subScreens = ['question-screen', 'appreciation-screen', 'result-screen'];
+    subScreens.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.classList.add('hidden'); el.classList.remove('active'); }
+    });
     
-    if (typeof createGameVFX === 'function') createGameVFX('screenChange');
-}
-
-function backToMenu() {
-    gameActive = false;
-    showScreen('menu');
-    if (typeof createGameVFX === 'function') createGameVFX('menuOpen');
-}
-
-function showInfo() { showScreen('info'); }
-function showSupporters() { showScreen('supporters-screen'); }
-function showPlayerNameScreen() { 
-    showScreen('player-name-screen'); 
-    const input = document.getElementById('player-name-input');
-    if (input) {
-        setTimeout(() => input.focus(), 300);
+    const target = document.getElementById(type);
+    if (target) {
+        target.classList.remove('hidden');
+        setTimeout(() => target.classList.add('active'), 50);
     }
 }
 
-// ==================== GAME LOGIC ====================
-
-function setPlayerName() {
-    const input = document.getElementById('player-name-input');
-    if (input && input.value.trim() !== '') {
-        playerName = input.value.trim();
-        savePlayerStats();
-    }
-    startGame();
-}
-
+// --- Gameplay ---
 async function startGame() {
     currentQuestionIndex = 0;
     correctAnswers = 0;
     gameActive = true;
-    playerAnswers = [];
-    showAppreciation = false;
     
     await loadQuestions();
     
+    const pDisplay = document.getElementById('current-player');
+    if (pDisplay) pDisplay.textContent = playerName.toUpperCase();
+    
     showScreen('game');
-    showGameSubScreen('question');
-    
-    const playerDisp = document.getElementById('current-player');
-    if (playerDisp) playerDisp.textContent = playerName.toUpperCase();
-    
-    if (typeof createGameVFX === 'function') createGameVFX('gameStart');
-    
-    // Load first question with small delay for transition
-    setTimeout(() => {
-        loadQuestion();
-    }, 300);
+    loadQuestion();
 }
 
 async function loadQuestions() {
     try {
-        const response = await fetch('questions.json');
-        if (!response.ok) throw new Error("JSON missing");
-        const data = await response.json();
-        questions = data.sort(() => Math.random() - 0.5).slice(0, 5);
-        console.log(`Loaded ${questions.length} questions`);
+        const res = await fetch('questions.json');
+        const data = await res.json();
+        questions = data.sort(() => 0.5 - Math.random()).slice(0, 5);
     } catch (e) {
-        console.error("Error loading questions:", e);
-        // Fallback if file doesn't exist to prevent black screen
-        questions = [{
-            question: "A true shinobi moves like...",
-            options: ["A storm", "A shadow", "A flame", "A river"],
-            answer: "A shadow",
-            difficulty: "Easy",
-            commentator: "rikimaru"
-        }, {
-            question: "The Azuma clan's sacred blade is called...",
-            options: ["Kusanagi", "Izayoi", "Muramasa", "Masamune"],
-            answer: "Izayoi",
-            difficulty: "Medium",
-            commentator: "rikimaru"
-        }, {
-            question: "What does 'Tenchu' mean?",
-            options: ["Heaven's Punishment", "Shadow Blade", "Silent Death", "Night Warrior"],
-            answer: "Heaven's Punishment",
-            difficulty: "Medium",
-            commentator: "ayame"
-        }, {
-            question: "Which tool is used for blinding enemies?",
-            options: ["Shuriken", "Kunai", "Metsubishi", "Shuko"],
-            answer: "Metsubishi",
-            difficulty: "Hard",
-            commentator: "tatsumaru"
-        }, {
-            question: "Rikimaru's signature technique is...",
-            options: ["Hiryu", "Tobikomi", "Shikoro", "Kazekiri"],
-            answer: "Hiryu",
-            difficulty: "Hard",
-            commentator: "rikimaru"
-        }];
+        questions = [{ question: "Azuma Clan Status?", options: ["Ready", "Wait"], answer: "Ready" }];
     }
 }
 
 function loadQuestion() {
-    if (!gameActive) return;
-    
-    // Check if all questions are answered
     if (currentQuestionIndex >= questions.length) {
-        showAppreciation = Math.random() < 0.4;
-        
-        if (showAppreciation && typeof supporters !== 'undefined' && supporters.length > 0) {
-            showAppreciationScreen();
-        } else {
-            showResults();
-        }
+        handleTrialEnd();
         return;
     }
 
     const q = questions[currentQuestionIndex];
-    const qText = document.getElementById('question-text');
-    if (qText) {
-        qText.style.opacity = '0';
-        setTimeout(() => {
-            qText.textContent = q.question;
-            qText.style.opacity = '1';
-        }, 200);
-    }
-    
-    // Update Trial Counters
-    ['current-trial', 'trial-number', 'progress-current'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.textContent = currentQuestionIndex + 1;
-    });
+    document.getElementById('question-text').textContent = q.question;
+    document.getElementById('trial-number').textContent = currentQuestionIndex + 1;
+    document.getElementById('progress-current').textContent = currentQuestionIndex + 1;
+    document.getElementById('progress-fill').style.width = `${(currentQuestionIndex / 5) * 100}%`;
 
-    // Update Difficulty
-    const diff = document.querySelector('.diff-level');
-    if (diff) diff.textContent = q.difficulty || "NORMAL";
-
-    // Progress Bar
-    const fill = document.getElementById('progress-fill');
-    if (fill) fill.style.width = `${(currentQuestionIndex / questions.length) * 100}%`;
-
-    // Create options with letters
     const optionsDiv = document.getElementById('options');
-    if (optionsDiv) {
-        optionsDiv.innerHTML = '';
-        const letters = ['A', 'B', 'C', 'D'];
-        q.options.forEach((opt, index) => {
-            const btn = document.createElement('button');
-            btn.className = 'btn-ninja';
-            btn.innerHTML = `<span class="option-letter">${letters[index]}</span><span class="option-text">${opt}</span>`;
-            btn.onclick = () => checkAnswer(opt, q.answer, q.commentator || 'rikimaru');
-            optionsDiv.appendChild(btn);
-        });
-    }
-    showGameSubScreen('question');
-}
+    optionsDiv.innerHTML = '';
+    
+    q.options.forEach(opt => {
+        const btn = document.createElement('button');
+        btn.className = 'btn-ninja';
+        btn.innerHTML = `<span>${opt}</span>`;
+        btn.onclick = () => {
+            if (opt === q.answer) {
+                correctAnswers++;
+                if (window.createGameVFX) createGameVFX('correct');
+            } else {
+                if (window.createGameVFX) createGameVFX('incorrect');
+            }
+            
+            // Visual feedback before next question
+            const allBtns = optionsDiv.querySelectorAll('button');
+            allBtns.forEach(b => {
+                b.disabled = true;
+                if (b.textContent === q.answer) b.style.borderColor = "#00ff00";
+            });
 
-function checkAnswer(selected, correct, commentator) {
-    const isCorrect = (selected === correct);
-    playerAnswers.push({ selected, correct, isCorrect, commentator });
-
-    const btns = document.querySelectorAll('#options .btn-ninja');
-    btns.forEach(btn => {
-        btn.disabled = true;
-        btn.style.pointerEvents = 'none';
-        
-        const optionText = btn.querySelector('.option-text').textContent;
-        if (optionText === correct) {
-            btn.style.background = 'linear-gradient(145deg, #1a2a1a, #111a11)';
-            btn.style.borderColor = '#00aa00';
-        }
-        if (optionText === selected && !isCorrect) {
-            btn.style.background = 'linear-gradient(145deg, #2a1a1a, #1a1111)';
-            btn.style.borderColor = '#ff0000';
-        }
-    });
-
-    if (isCorrect) {
-        correctAnswers++;
-        if (typeof createGameVFX === 'function') createGameVFX('correct');
-    } else {
-        if (typeof createGameVFX === 'function') createGameVFX('incorrect');
-    }
-
-    setTimeout(() => {
-        currentQuestionIndex++;
-        loadQuestion();
-    }, 1200);
-}
-
-// ==================== RANKING & STATS ====================
-
-function updateStatsDisplay() {
-    // Update player name
-    const playerNameEl = document.getElementById('stats-player-name');
-    if (playerNameEl) playerNameEl.textContent = playerName.toUpperCase();
-    
-    // Update stats values
-    const set = (id, val) => { 
-        const el = document.getElementById(id); 
-        if (el) el.textContent = val; 
-    };
-    
-    set('stat-total-score', playerStats.totalScore);
-    set('stat-trials-completed', playerStats.trialsCompleted);
-    set('stat-coins', playerStats.coins);
-    
-    // Calculate success rate
-    const successRate = playerStats.totalQuestionsAnswered > 0 
-        ? Math.round((playerStats.totalCorrectAnswers / playerStats.totalQuestionsAnswered) * 100)
-        : 0;
-    set('stat-success-rate', `${successRate}%`);
-    
-    // Update rank display
-    const rankName = rankRequirements[playerStats.currentRank]?.displayName || "APPRENTICE";
-    set('stat-rank-name', rankName);
-    
-    // Update stars
-    const starsDisplay = getStarsDisplay(playerStats.rankStars);
-    set('stat-rank-stars', starsDisplay);
-    
-    // Update progress bar
-    const progress = getRankProgress();
-    set('stat-rank-progress-text', `${playerStats.totalScore}/${progress.required}`);
-    
-    const progressBar = document.getElementById('stat-rank-progress');
-    if (progressBar) {
-        progressBar.style.width = `${progress.percent}%`;
-    }
-    
-    // Set rank color
-    const rankNameEl = document.getElementById('stat-rank-name');
-    if (rankNameEl) {
-        const rankColors = {
-            "apprentice": "#808080",
-            "shinobi": "#9370db",
-            "assassin": "#dc143c",
-            "ninja": "#4169e1",
-            "masterNinja": "#c0c0c0",
-            "grandMaster": "#d4af37"
+            setTimeout(() => {
+                currentQuestionIndex++;
+                loadQuestion();
+            }, 1000);
         };
-        rankNameEl.style.color = rankColors[playerStats.currentRank] || "#808080";
+        optionsDiv.appendChild(btn);
+    });
+    showGameSubScreen('question-screen');
+}
+
+// --- Sequence Control ---
+function handleTrialEnd() {
+    // 30% chance to show appreciation if supporters.js is loaded
+    if (Math.random() < 0.3 && typeof supporters !== 'undefined' && supporters.length > 0) {
+        const sup = supporters[Math.floor(Math.random() * supporters.length)];
+        const nameEl = document.getElementById('honored-name');
+        if (nameEl) nameEl.textContent = sup.name;
+        
+        const handleEl = document.getElementById('honored-handle');
+        if (handleEl) handleEl.textContent = sup.handle || "";
+
+        showGameSubScreen('appreciation-screen');
+    } else {
+        showResults();
     }
 }
 
 function showResults() {
-    const totalQuestions = questions.length;
-    const percentage = Math.round((correctAnswers / totalQuestions) * 100);
-    
-    // Calculate points earned
-    const pointsEarned = (correctAnswers * POINTS_PER_CORRECT) + 
-                        (correctAnswers === totalQuestions ? POINTS_PER_GAME_COMPLETION : 0);
-    
-    // Add to player progression
-    const gameResult = addGameScore(pointsEarned, correctAnswers, totalQuestions);
-    
-    // Update results screen
-    updateResultsDisplay(pointsEarned, gameResult.coins, totalQuestions, correctAnswers, percentage, gameResult);
-    
-    // Show results screen
-    showGameSubScreen('results');
-    
-    // Create VFX based on performance
-    if (typeof createGameVFX === 'function') {
-        if (percentage >= 50) {
-            createGameVFX('victory');
-        } else {
-            createGameVFX('defeat');
-        }
+    const pts = (correctAnswers * POINTS_PER_CORRECT) + (correctAnswers === 5 ? COMPLETION_BONUS : 0);
+    const coins = (correctAnswers * COINS_PER_CORRECT);
+    const oldTotal = playerStats.totalScore;
+
+    // Update Data
+    playerStats.totalScore += pts;
+    playerStats.coins += coins;
+    playerStats.trialsCompleted++;
+    playerStats.totalCorrectAnswers += correctAnswers;
+    playerStats.totalQuestionsAnswered += 5;
+
+    // Rank Logic
+    const oldRank = playerStats.currentRank;
+    for (const [key, req] of Object.entries(rankRequirements)) {
+        if (playerStats.totalScore >= req.minScore) playerStats.currentRank = key;
     }
+    
+    savePlayerStats();
+
+    // UI Updates
+    document.getElementById('result-correct').textContent = `${correctAnswers}/5`;
+    document.getElementById('result-points').textContent = `+${pts}`;
+    document.getElementById('result-coins').textContent = `+${coins}`;
+    
+    animateValue('result-total', oldTotal, playerStats.totalScore, 1000);
+
+    const rankNotif = document.getElementById('rank-notification');
+    if (rankNotif) rankNotif.style.display = (oldRank !== playerStats.currentRank) ? 'flex' : 'none';
+
+    // Character Comments
+    if (typeof getCharacterFeedback === 'function') {
+        const feedback = getCharacterFeedback(correctAnswers);
+        document.getElementById('feedback-text').textContent = feedback.text;
+        const portrait = document.getElementById('feedback-portrait');
+        if (portrait) portrait.style.backgroundImage = `url('${feedback.image}')`;
+    }
+
+    showGameSubScreen('result-screen');
 }
 
-function updateResultsDisplay(pointsEarned, coinsEarned, totalQuestions, correctAnswers, percentage, gameResult) {
-    // Update score breakdown
-    document.getElementById('result-correct').textContent = `${correctAnswers}/${totalQuestions}`;
-    document.getElementById('result-points').textContent = `+${pointsEarned}`;
-    document.getElementById('result-coins').textContent = `+${coinsEarned}`;
-    document.getElementById('result-total').textContent = playerStats.totalScore;
+// --- Stats Screen Logic ---
+function updateStatsDisplay() {
+    const set = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
     
-    // Show rank notification if rank changed
-    const rankNotification = document.getElementById('rank-notification');
-    if (gameResult.rankChanged) {
-        rankNotification.style.display = 'flex';
-        rankNotification.innerHTML = `
-            <i class="fas fa-arrow-up"></i>
-            <span>Rank Up! ${rankRequirements[gameResult.oldRank]?.displayName} → ${rankRequirements[gameResult.newRank]?.displayName}</span>
-        `;
+    set('stats-player-name', playerName.toUpperCase());
+    set('stat-total-score', playerStats.totalScore);
+    set('stat-trials-completed', playerStats.trialsCompleted);
+    set('stat-coins', playerStats.coins);
+    
+    const rate = playerStats.totalQuestionsAnswered > 0 
+        ? Math.round((playerStats.totalCorrectAnswers / playerStats.totalQuestionsAnswered) * 100) : 0;
+    set('stat-success-rate', `${rate}%`);
+
+    const rank = rankRequirements[playerStats.currentRank];
+    set('stat-rank-name', rank.displayName);
+    
+    // Star Logic (0-3)
+    if (rank.nextRank) {
+        const next = rankRequirements[rank.nextRank];
+        const progress = playerStats.totalScore - rank.minScore;
+        const totalNeeded = next.minScore - rank.minScore;
+        const percent = Math.min(100, Math.floor((progress / totalNeeded) * 100));
         
-        // Add celebration effect
-        if (typeof createGameVFX === 'function') {
-            setTimeout(() => {
-                createGameVFX('victory');
-            }, 500);
-        }
+        const stars = percent >= 90 ? "★★★" : (percent >= 60 ? "★★☆" : (percent >= 30 ? "★☆☆" : "☆☆☆"));
+        set('stat-rank-stars', stars);
+        set('stat-rank-progress-text', `${playerStats.totalScore}/${next.minScore}`);
+        const bar = document.getElementById('stat-rank-progress');
+        if (bar) bar.style.width = `${percent}%`;
     } else {
-        rankNotification.style.display = 'none';
-    }
-    
-    // Get character feedback based on performance
-    let feedbackCharacter;
-    let feedbackMessage = "";
-    
-    // Determine which character gives feedback based on percentage
-    if (percentage >= 80) {
-        feedbackCharacter = 'rikimaru';
-    } else if (percentage >= 60) {
-        feedbackCharacter = 'ayame';
-    } else {
-        feedbackCharacter = 'tatsumaru';
-    }
-    
-    // Get appropriate feedback message
-    feedbackMessage = getPerformanceFeedback(feedbackCharacter, percentage, correctAnswers, totalQuestions);
-    
-    // Update feedback
-    const feedbackText = document.getElementById('feedback-text');
-    if (feedbackText) feedbackText.textContent = feedbackMessage;
-    
-    // Set character portrait if function exists
-    if (typeof getCharacterPortrait === 'function') {
-        const portrait = getCharacterPortrait(feedbackCharacter);
-        const feedbackPortrait = document.getElementById('feedback-portrait');
-        if (portrait && feedbackPortrait) {
-            feedbackPortrait.style.backgroundImage = `url('${portrait}')`;
-        }
+        set('stat-rank-stars', "★★★");
+        set('stat-rank-progress-text', "MAX RANK");
     }
 }
 
-// Get performance feedback from characters
-function getPerformanceFeedback(character, percentage, correct, total) {
-    if (character === 'rikimaru') {
-        if (percentage >= 80) {
-            return "Your precision is commendable. Continue to hone your skills in the shadows.";
-        } else if (percentage >= 60) {
-            return "Acceptable performance. Focus on improving your judgment.";
-        } else {
-            return "Your technique needs refinement. Study the ancient scrolls.";
-        }
-    }
-    
-    if (character === 'ayame') {
-        if (percentage >= 80) {
-            return "Well done! Your intuition serves you well in the shadows!";
-        } else if (percentage >= 60) {
-            return "Good effort! Remember, a true kunoichi relies on both skill and wit!";
-        } else {
-            return "You need more practice! Don't lose heart - every master was once a beginner!";
-        }
-    }
-    
-    if (character === 'tatsumaru') {
-        if (percentage >= 80) {
-            return "Hmph. Not bad. You understand that strength comes from knowledge.";
-        } else if (percentage >= 60) {
-            return "Adequate. But true power requires perfection.";
-        } else {
-            return "Weak. The shadows have no mercy for the unprepared.";
-        }
-    }
-    
-    return "The trial is complete. Your performance has been recorded.";
+// --- Utilities ---
+function animateValue(id, start, end, duration) {
+    const obj = document.getElementById(id);
+    if (!obj) return;
+    let startTimestamp = null;
+    const step = (timestamp) => {
+        if (!startTimestamp) startTimestamp = timestamp;
+        const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+        obj.textContent = Math.floor(progress * (end - start) + start);
+        if (progress < 1) window.requestAnimationFrame(step);
+    };
+    window.requestAnimationFrame(step);
 }
 
-// ==================== APPRECIATION SCREEN ====================
+// --- Global Hooks for HTML ---
+window.setPlayerName = () => {
+    const val = document.getElementById('player-name-input').value.trim();
+    if (val) playerName = val;
+    savePlayerStats();
+    startGame();
+};
 
-function showAppreciationScreen() {
-    if (typeof supporters === 'undefined' || supporters.length === 0) {
-        showResults();
-        return;
-    }
-    
-    const randomIndex = Math.floor(Math.random() * supporters.length);
-    const supporter = supporters[randomIndex];
-    
-    const characters = ['rikimaru', 'ayame', 'tatsumaru'];
-    const randomCharacter = characters[Math.floor(Math.random() * characters.length)];
-    
-    let portrait = '';
-    if (typeof getCharacterPortrait === 'function') {
-        portrait = getCharacterPortrait(randomCharacter);
-    }
-    
-    let characterName = "Azuma Master";
-    if (typeof getCharacterDisplayName === 'function') {
-        characterName = getCharacterDisplayName(randomCharacter);
-    }
-    
-    const messages = [
-        `${characterName} acknowledges your support.`,
-        `${characterName} honors those who stand with the Azuma.`,
-        `From the shadows, ${characterName} gives thanks.`,
-        `${characterName} recognizes true allies of the clan.`
-    ];
-    
-    const randomMessage = messages[Math.floor(Math.random() * messages.length)];
-    
-    document.getElementById('appreciation-text').textContent = randomMessage;
-    document.getElementById('honored-name').textContent = supporter.name;
-    document.getElementById('honored-handle').textContent = supporter.handle || '';
-    
-    const supporterRank = document.querySelector('.supporter-rank');
-    if (supporterRank && supporter.rank) {
-        // Use the local function from supporters.js
-        if (typeof getRankInfo === 'function') {
-            const rankInfo = getRankInfo(supporter.rank);
-            if (rankInfo) {
-                supporterRank.innerHTML = `
-                    <i class="fas fa-shield-alt"></i>
-                    <span>${rankInfo.name}</span>
-                `;
-            }
-        } else {
-            // Fallback if function not available
-            supporterRank.innerHTML = `
-                <i class="fas fa-shield-alt"></i>
-                <span>HONORED ALLY</span>
-            `;
-        }
-    }
-    
-    if (portrait) {
-        const appreciationPortrait = document.getElementById('appreciation-portrait');
-        if (appreciationPortrait) {
-            appreciationPortrait.style.backgroundImage = `url('${portrait}')`;
-        }
-    }
-    
-    showGameSubScreen('appreciation');
-    
-    if (typeof createGameVFX === 'function') {
-        createGameVFX('appreciation');
-    }
-}
-
-// ==================== UTILS & MISSING FUNCTIONS ====================
-
-function showGameSubScreen(type) {
-    const screens = ['question-screen', 'appreciation-screen', 'result-screen'];
-    screens.forEach(s => {
-        const el = document.getElementById(s);
-        if (el) { 
-            el.classList.add('hidden'); 
-            el.classList.remove('active'); 
-        }
-    });
-    const target = document.getElementById(type + '-screen');
-    if (target) { 
-        target.classList.remove('hidden'); 
-        setTimeout(() => target.classList.add('active'), 50);
-    }
-}
-
-function showStatsScreen() {
-    showScreen('stats-screen');
-    updateStatsDisplay();
-}
-
-function showMissionsScreen() {
-    showScreen('missions-screen');
-}
-
-function showStatsScreenFromResults() {
-    showScreen('stats-screen');
-    updateStatsDisplay();
-}
-
-function shareStats() {
-    const rank = document.getElementById('stat-rank-name')?.textContent || 'APPRENTICE';
-    const stars = document.getElementById('stat-rank-stars')?.textContent || '☆☆☆';
-    const score = document.getElementById('stat-total-score')?.textContent || '0';
-    const text = `I achieved ${rank} ${stars} with ${score} points in Tenchu Shiren! 天誅試練`;
-    
-    if (navigator.share) {
-        navigator.share({
-            title: 'My Tenchu Shiren Stats',
-            text: text,
-            url: window.location.href
-        }).catch(err => {
-            console.log('Error sharing:', err);
-            fallbackShare(text);
-        });
-    } else {
-        fallbackShare(text);
-    }
-}
-
-function fallbackShare(text) {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(() => {
-            alert('Stats copied to clipboard! Share it with your fellow shinobi.');
-        });
-    } else {
-        alert('Share this text:\n\n' + text);
-    }
-}
-
-// Animate number counting up
-function animateValue(elementId, start, end, duration) {
-    const element = document.getElementById(elementId);
-    if (!element) return;
-    
-    const range = end - start;
-    const startTime = performance.now();
-    
-    function update(currentTime) {
-        const elapsed = currentTime - startTime;
-        const progress = Math.min(elapsed / duration, 1);
-        
-        // Easing function for smooth animation
-        const easeProgress = progress < 0.5 
-            ? 2 * progress * progress 
-            : 1 - Math.pow(-2 * progress + 2, 2) / 2;
-        
-        const currentValue = Math.floor(start + (range * easeProgress));
-        element.textContent = currentValue;
-        
-        if (progress < 1) {
-            requestAnimationFrame(update);
-        } else {
-            element.textContent = end;
-        }
-    }
-    
-    requestAnimationFrame(update);
-}
-
-// ==================== INITIALIZATION ====================
-
-function initializeGame() {
-    console.log('Tenchu Shiren - Initializing...');
-    
-    // Lock body scrolling
-    document.body.style.overflow = 'hidden';
-    
-    // Initialize VFX if available
-    if (typeof initVFX === 'function') {
-        initVFX();
-    }
-    
-    // Load player stats
-    loadPlayerStats();
-    
-    // Initialize supporters list if available
-    if (typeof updateSupportersList === 'function') {
-        updateSupportersList();
-    }
-    
-    // Setup name input
-    const nameInput = document.getElementById('player-name-input');
-    if (nameInput) {
-        nameInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                setPlayerName();
-            }
-        });
-    }
-    
-    // Show menu after a short delay to ensure DOM is ready
-    setTimeout(() => {
-        showScreen('menu');
-    }, 100);
-    
-    console.log('Game initialized successfully');
-}
-
-// Initialize when DOM is ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeGame);
-} else {
-    initializeGame();
-}
-
-// ==================== GLOBAL EXPORTS ====================
-
-window.showPlayerNameScreen = showPlayerNameScreen;
-window.showInfo = showInfo;
-window.showSupporters = showSupporters;
-window.showStatsScreen = showStatsScreen;
-window.showMissionsScreen = showMissionsScreen;
-window.showStatsScreenFromResults = showStatsScreenFromResults;
-window.backToMenu = backToMenu;
-window.setPlayerName = setPlayerName;
+window.showPlayerNameScreen = () => showScreen('player-name-screen');
+window.showInfo = () => showScreen('info');
+window.showStatsScreen = () => { showScreen('stats-screen'); updateStatsDisplay(); };
+window.showStatsScreenFromResults = window.showStatsScreen;
+window.showSupporters = () => showScreen('supporters-screen');
+window.showMissionsScreen = () => showScreen('missions-screen');
+window.backToMenu = () => showScreen('menu');
 window.startGame = startGame;
-window.showResults = showResults;
-window.shareStats = shareStats;
-window.updateStatsDisplay = updateStatsDisplay;
-window.loadPlayerStats = loadPlayerStats;
-window.savePlayerStats = savePlayerStats;
+window.showResults = showResults; // Hook for Appreciation button
