@@ -2462,6 +2462,13 @@ button:active i, .btn-ninja:active i {
     100% { transform: scale(1); }
 }
 
+.missions-footer {
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(139, 0, 0, 0.3);
+    text-align: center;
+}
+
 /* ==================== RESPONSIVE ==================== */
 @media (max-width: 768px) {
     .screen {
