@@ -69,36 +69,97 @@ function getAvailableMissions() {
     });
 }
 
-// Update missions list display
+// Update missions list display - REORDERED: Missions list first
 function updateMissionsList() {
     const missionsList = document.getElementById('missions-list');
     if (!missionsList) return;
     
     const availableMissions = getAvailableMissions();
     
-    if (availableMissions.length === 0) {
-        missionsList.innerHTML = `
-            <div class="missions-intro">
-                <h3><i class="fas fa-info-circle"></i> AZUMA CLAN MISSIONS</h3>
-                <p class="intro-text">
-                    Test your skills with special operations. Each mission challenges your stealth, 
-                    judgment, and knowledge of ninja arts.
-                </p>
-                
-                <div class="no-missions">
-                    <i class="fas fa-ban"></i>
-                    <h4>NO MISSIONS AVAILABLE</h4>
-                    <p>Increase your rank or complete trials to unlock missions!</p>
-                    <button class="btn-ninja" onclick="showStatsScreen()">
-                        <i class="fas fa-chart-line"></i> CHECK YOUR RANK
+    let missionsHTML = '';
+    
+    // MISSIONS LIST SECTION - MOVED TO TOP
+    if (availableMissions.length > 0) {
+        missionsHTML += `
+            <div class="available-missions-title">
+                <h3><i class="fas fa-list"></i> AVAILABLE MISSIONS (${availableMissions.length})</h3>
+            </div>
+            
+            <div class="missions-container">
+        `;
+        
+        availableMissions.forEach(mission => {
+            const status = missionStatus[mission.id] || 'new';
+            const statusClass = status === 'completed' ? 'mission-completed' : 
+                              status === 'failed' ? 'mission-failed' : 
+                              status === 'in-progress' ? 'mission-in-progress' : 'mission-new';
+            
+            // Difficulty color
+            let difficultyColor = '#00aa00';
+            if (mission.difficulty === 'medium') difficultyColor = '#d4af37';
+            if (mission.difficulty === 'hard') difficultyColor = '#8b0000';
+            
+            missionsHTML += `
+                <div class="mission-item ${statusClass}">
+                    <div class="mission-header">
+                        <div class="mission-title-section">
+                            <h3>${mission.title}</h3>
+                            <span class="mission-theme">${mission.theme ? mission.theme.toUpperCase() : 'STEALTH'}</span>
+                        </div>
+                        <div class="mission-meta">
+                            <span class="mission-difficulty" style="border-color: ${difficultyColor}; color: ${difficultyColor}">
+                                ${mission.difficulty.toUpperCase()}
+                            </span>
+                            <span class="mission-status">${getStatusText(status)}</span>
+                        </div>
+                    </div>
+                    
+                    <p class="mission-description">${mission.description}</p>
+                    
+                    <div class="mission-details">
+                        <div class="detail-item">
+                            <i class="fas fa-moon"></i>
+                            <span>${mission.timeOfDay || 'NIGHT'}</span>
+                        </div>
+                        <div class="detail-item">
+                            <i class="fas fa-shield-alt"></i>
+                            <span>Rank: ${mission.requiredRank.toUpperCase()}</span>
+                        </div>
+                        <div class="detail-item">
+                            <i class="fas fa-flag"></i>
+                            <span>${mission.story ? mission.story.length : '5'} scenes</span>
+                        </div>
+                    </div>
+                    
+                    <div class="mission-rewards">
+                        <div class="reward-item">
+                            <i class="fas fa-coins" style="color: #d4af37;"></i>
+                            <span>${mission.reward.coins} Coins</span>
+                        </div>
+                        <div class="reward-item">
+                            <i class="fas fa-star" style="color: #8b0000;"></i>
+                            <span>${mission.reward.points} Points</span>
+                        </div>
+                        ${mission.reward.unlockItem ? `
+                        <div class="reward-item">
+                            <i class="fas fa-gift" style="color: #9370db;"></i>
+                            <span>Unlocks: ${formatItemName(mission.reward.unlockItem)}</span>
+                        </div>` : ''}
+                    </div>
+                    
+                    <button class="btn-ninja btn-mission-start" onclick="startMission('${mission.id}')">
+                        ${getButtonText(status)}
+                        <i class="fas fa-arrow-right"></i>
                     </button>
                 </div>
-            </div>
-        `;
-        return;
+            `;
+        });
+        
+        missionsHTML += `</div>`;
     }
     
-    let missionsHTML = `
+    // INFORMATION SECTION - MOVED TO BOTTOM
+    missionsHTML += `
         <div class="missions-intro">
             <h3><i class="fas fa-info-circle"></i> AZUMA CLAN MISSIONS</h3>
             <p class="intro-text">
@@ -116,7 +177,23 @@ function updateMissionsList() {
                     <li><i class="fas fa-coins"></i> <strong>Rewards:</strong> Earn coins and points for successful missions</li>
                 </ul>
             </div>
-            
+    `;
+    
+    // Show "no missions" message only if there are none
+    if (availableMissions.length === 0) {
+        missionsHTML += `
+            <div class="no-missions">
+                <i class="fas fa-ban"></i>
+                <h4>NO MISSIONS AVAILABLE</h4>
+                <p>Increase your rank or complete trials to unlock missions!</p>
+                <button class="btn-ninja" onclick="showStatsScreen()">
+                    <i class="fas fa-chart-line"></i> CHECK YOUR RANK
+                </button>
+            </div>
+        `;
+    }
+    
+    missionsHTML += `
             <div class="missions-development">
                 <h4><i class="fas fa-hourglass-half"></i> MORE MISSIONS COMING!</h4>
                 <p class="update-notice">
@@ -128,82 +205,8 @@ function updateMissionsList() {
                 </button>
             </div>
         </div>
-        
-        <div class="available-missions-title">
-            <h3><i class="fas fa-list"></i> AVAILABLE MISSIONS (${availableMissions.length})</h3>
-        </div>
-        
-        <div class="missions-container">
     `;
     
-    availableMissions.forEach(mission => {
-        const status = missionStatus[mission.id] || 'new';
-        const statusClass = status === 'completed' ? 'mission-completed' : 
-                          status === 'failed' ? 'mission-failed' : 
-                          status === 'in-progress' ? 'mission-in-progress' : 'mission-new';
-        
-        // Difficulty color
-        let difficultyColor = '#00aa00';
-        if (mission.difficulty === 'medium') difficultyColor = '#d4af37';
-        if (mission.difficulty === 'hard') difficultyColor = '#8b0000';
-        
-        missionsHTML += `
-            <div class="mission-item ${statusClass}">
-                <div class="mission-header">
-                    <div class="mission-title-section">
-                        <h3>${mission.title}</h3>
-                        <span class="mission-theme">${mission.theme ? mission.theme.toUpperCase() : 'STEALTH'}</span>
-                    </div>
-                    <div class="mission-meta">
-                        <span class="mission-difficulty" style="border-color: ${difficultyColor}; color: ${difficultyColor}">
-                            ${mission.difficulty.toUpperCase()}
-                        </span>
-                        <span class="mission-status">${getStatusText(status)}</span>
-                    </div>
-                </div>
-                
-                <p class="mission-description">${mission.description}</p>
-                
-                <div class="mission-details">
-                    <div class="detail-item">
-                        <i class="fas fa-moon"></i>
-                        <span>${mission.timeOfDay || 'NIGHT'}</span>
-                    </div>
-                    <div class="detail-item">
-                        <i class="fas fa-shield-alt"></i>
-                        <span>Rank: ${mission.requiredRank.toUpperCase()}</span>
-                    </div>
-                    <div class="detail-item">
-                        <i class="fas fa-flag"></i>
-                        <span>${mission.story ? mission.story.length : '5'} scenes</span>
-                    </div>
-                </div>
-                
-                <div class="mission-rewards">
-                    <div class="reward-item">
-                        <i class="fas fa-coins" style="color: #d4af37;"></i>
-                        <span>${mission.reward.coins} Coins</span>
-                    </div>
-                    <div class="reward-item">
-                        <i class="fas fa-star" style="color: #8b0000;"></i>
-                        <span>${mission.reward.points} Points</span>
-                    </div>
-                    ${mission.reward.unlockItem ? `
-                    <div class="reward-item">
-                        <i class="fas fa-gift" style="color: #9370db;"></i>
-                        <span>Unlocks: ${formatItemName(mission.reward.unlockItem)}</span>
-                    </div>` : ''}
-                </div>
-                
-                <button class="btn-ninja btn-mission-start" onclick="startMission('${mission.id}')">
-                    ${getButtonText(status)}
-                    <i class="fas fa-arrow-right"></i>
-                </button>
-            </div>
-        `;
-    });
-    
-    missionsHTML += `</div>`;
     missionsList.innerHTML = missionsHTML;
 }
 
@@ -528,7 +531,7 @@ function startMissionGame() {
     showMissionScene();
 }
 
-// Show mission scene
+// Show mission scene - UPDATED: Add feedback system
 function showMissionScene() {
     if (!currentScene) {
         endMission('failure');
@@ -559,6 +562,14 @@ function showMissionScene() {
                         <h3>SITUATION</h3>
                     </div>
                     <p>${currentScene.text}</p>
+                </div>
+                
+                <!-- Feedback Message Area -->
+                <div id="mission-feedback" class="mission-feedback hidden">
+                    <div class="feedback-content">
+                        <i class="fas fa-comment-alt"></i>
+                        <span id="feedback-message"></span>
+                    </div>
                 </div>
                 
                 <div class="scene-options-container">
@@ -619,12 +630,39 @@ function loadSceneOptions(scene) {
     });
 }
 
-// Handle option selection
+// NEW: Show in-game feedback message
+function showMissionFeedback(message, type = 'info') {
+    const feedbackEl = document.getElementById('mission-feedback');
+    const messageEl = document.getElementById('feedback-message');
+    
+    if (feedbackEl && messageEl) {
+        messageEl.textContent = message;
+        feedbackEl.className = `mission-feedback feedback-${type}`;
+        feedbackEl.style.display = 'block';
+        
+        // Auto-hide after 3 seconds
+        setTimeout(() => {
+            feedbackEl.style.display = 'none';
+        }, 3000);
+    }
+}
+
+// Handle option selection - UPDATED: Use in-game feedback
 function selectOption(option) {
+    // Disable all buttons during processing
+    const optionButtons = document.querySelectorAll('.option-btn');
+    optionButtons.forEach(btn => {
+        btn.disabled = true;
+        btn.style.opacity = '0.6';
+    });
+    
     // Check if spotted
     if (option.ifSpotted === "MISSION_FAILED") {
         missionState.spotted = true;
-        endMission('failure');
+        setTimeout(() => {
+            showMissionFeedback("You've been detected! Mission failed.", 'failure');
+            setTimeout(() => endMission('failure'), 2000);
+        }, 1000);
         return;
     }
     
@@ -640,48 +678,71 @@ function selectOption(option) {
         if (itemIndex > -1) {
             selectedMissionItems.splice(itemIndex, 1);
         }
+        
+        // Update inventory display
+        const itemsPanel = document.getElementById('items-panel');
+        if (itemsPanel) {
+            itemsPanel.innerHTML = selectedMissionItems.map(item => `
+                <div class="available-item owned">
+                    <i class="fas fa-check-circle"></i>
+                    <span>${formatItemName(item)}</span>
+                </div>
+            `).join('');
+        }
+        
+        // Show item usage feedback
+        showMissionFeedback(`Used: ${formatItemName(option.itemUsed)}`, 'item');
     }
     
     // Track kills
     if (option.kills) {
         missionState.kills += option.kills;
+        showMissionFeedback(`Silent kill. Enemy eliminated.`, 'stealth');
     }
     
-    // Track stealth score
-    if (option.stealthBonus) {
-        missionState.stealthScore += option.stealthBonus;
-    }
-    if (option.stealthPenalty) {
-        missionState.stealthScore -= option.stealthPenalty;
-    }
-    
-    // Show feedback
-    if (option.feedback && typeof createGameVFX === 'function') {
-        if (option.stealthBonus > option.stealthPenalty) {
-            createGameVFX('correct');
-        } else {
-            createGameVFX('incorrect');
-        }
+    // Track stealth score and show feedback
+    if (option.stealthBonus || option.stealthPenalty) {
+        const scoreChange = (option.stealthBonus || 0) - (option.stealthPenalty || 0);
+        missionState.stealthScore += scoreChange;
         
-        // Show feedback message
+        if (scoreChange > 0) {
+            showMissionFeedback(`Stealthy move! +${scoreChange} stealth`, 'success');
+        } else if (scoreChange < 0) {
+            showMissionFeedback(`Risk detected! ${scoreChange} stealth`, 'warning');
+        }
+    }
+    
+    // Show general feedback if provided
+    if (option.feedback) {
         setTimeout(() => {
-            alert(option.feedback);
-        }, 300);
+            showMissionFeedback(option.feedback, 'info');
+        }, 500);
+    }
+    
+    // VFX based on action
+    if (typeof createGameVFX === 'function') {
+        if (option.stealthBonus > (option.stealthPenalty || 0)) {
+            setTimeout(() => createGameVFX('correct'), 300);
+        } else if (option.stealthPenalty) {
+            setTimeout(() => createGameVFX('incorrect'), 300);
+        }
     }
     
     // Find next scene
     if (option.nextScene) {
-        const nextScene = findSceneByName(option.nextScene);
-        if (nextScene) {
-            currentScene = nextScene;
-            setTimeout(() => showMissionScene(), 1000);
-        } else {
-            // No next scene - mission complete
-            endMission('success');
-        }
+        setTimeout(() => {
+            const nextScene = findSceneByName(option.nextScene);
+            if (nextScene) {
+                currentScene = nextScene;
+                showMissionScene();
+            } else {
+                // No next scene - mission complete
+                endMission('success');
+            }
+        }, 1500);
     } else {
         // No next scene specified - mission complete
-        endMission('success');
+        setTimeout(() => endMission('success'), 1500);
     }
 }
 
@@ -918,6 +979,7 @@ window.showItemsScreen = showItemsScreen;
 window.buyItem = buyItem;
 window.removeItem = removeItem;
 window.clearSelectedItems = clearSelectedItems;
+window.showMissionFeedback = showMissionFeedback;
 
 // Initialize when DOM is ready
 if (document.readyState === 'loading') {
