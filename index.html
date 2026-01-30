@@ -197,27 +197,7 @@
             </div>
         </div>
     </div>
-<!-- Missions Screen -->
-<div id="missions-screen" class="screen hidden missions-screen">
-    <div class="screen-header">
-        <h2><i class="fas fa-flag"></i> MISSIONS</h2>
-        <div class="subtitle">Azuma Clan Operations</div>
-    </div>
-    
-    <div class="screen-content">
-        <div id="missions-list">
-            <!-- Missions content loaded by JavaScript -->
-        </div>
-        
-        <!-- ADD BACK BUTTON -->
-        <div class="missions-footer">
-            <button class="btn-ninja btn-back" onclick="backToMenu()">
-                <i class="fas fa-arrow-left"></i>
-                <span>RETURN TO MENU</span>
-            </button>
-        </div>
-    </div>
-</div>
+
     <!-- Stats Screen -->
     <div id="stats-screen" class="screen hidden stats-screen">
         <div class="screen-header">
@@ -395,8 +375,16 @@
                 <div class="stat-label">SCORE</div>
                 <div class="stat-value" id="live-score">0</div>
             </div>
-          
-       
+            <div class="game-stat-item">
+                <div class="stat-label">COINS</div>
+                <div class="stat-value" id="live-coins">0</div>
+            </div>
+            <div class="game-stat-item">
+                <div class="stat-label">RANK</div>
+                <div class="stat-value" id="live-rank">APPRENTICE</div>
+            </div>
+        </div>
+        
         <!-- Question Screen -->
         <div id="question-screen" class="game-content active">
             <div class="game-header">
