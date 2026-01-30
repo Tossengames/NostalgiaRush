@@ -1,5 +1,5 @@
 // ============================================
-// TENCHU SHIREN - game.js (Fixed Engine)
+// TENCHU SHIREN - COMPLETE GAME ENGINE
 // ============================================
 
 // Game state
@@ -9,7 +9,7 @@ let questions = [];
 let gameActive = false;
 let correctAnswers = 0;
 let playerAnswers = [];
-let showAppreciation = false;
+let currentScreen = 'menu';
 
 // Player progression system
 let playerStats = {
@@ -24,7 +24,7 @@ let playerStats = {
     highestRank: "apprentice"
 };
 
-// Rank requirements matching your HTML/Stats
+// Rank progression requirements
 const rankRequirements = {
     "apprentice": { minScore: 0, stars: 3, nextRank: "shinobi", displayName: "APPRENTICE" },
     "shinobi": { minScore: 100, stars: 3, nextRank: "assassin", displayName: "SHINOBI" },
@@ -38,7 +38,6 @@ const POINTS_PER_CORRECT = 20;
 const POINTS_PER_GAME_COMPLETION = 50;
 const COINS_PER_CORRECT = 2;
 const COINS_PER_GAME = 10;
-let currentScreen = 'menu';
 
 // ==================== INITIALIZATION & PERSISTENCE ====================
 
@@ -71,7 +70,7 @@ function savePlayerStats() {
     }
 }
 
-// ==================== SCREEN NAVIGATION ====================
+// ==================== SCREEN MANAGEMENT ====================
 
 function showScreen(screenId) {
     const screens = document.querySelectorAll('.screen');
@@ -83,7 +82,6 @@ function showScreen(screenId) {
     const target = document.getElementById(screenId);
     if (target) {
         target.classList.remove('hidden');
-        // Small delay to allow CSS transitions
         setTimeout(() => target.classList.add('active'), 50);
         currentScreen = screenId;
     }
@@ -91,25 +89,20 @@ function showScreen(screenId) {
     if (typeof createGameVFX === 'function') createGameVFX('screenChange');
 }
 
-function backToMenu() {
-    gameActive = false;
-    showScreen('menu');
+function showGameSubScreen(type) {
+    const screens = ['question-screen', 'appreciation-screen', 'result-screen'];
+    screens.forEach(s => {
+        const el = document.getElementById(s);
+        if (el) { el.classList.add('hidden'); el.classList.remove('active'); }
+    });
+    const target = document.getElementById(type + '-screen');
+    if (target) { 
+        target.classList.remove('hidden'); 
+        setTimeout(() => target.classList.add('active'), 50);
+    }
 }
-
-function showInfo() { showScreen('info'); }
-function showSupporters() { showScreen('supporters-screen'); }
-function showPlayerNameScreen() { showScreen('player-name-screen'); }
 
 // ==================== GAME LOGIC ====================
-
-function setPlayerName() {
-    const input = document.getElementById('player-name-input');
-    if (input && input.value.trim() !== '') {
-        playerName = input.value.trim();
-        savePlayerStats();
-    }
-    startGame();
-}
 
 async function startGame() {
     currentQuestionIndex = 0;
@@ -134,21 +127,22 @@ async function loadQuestions() {
         const response = await fetch('questions.json');
         if (!response.ok) throw new Error("JSON missing");
         const data = await response.json();
+        // Load 5 random questions
         questions = data.sort(() => Math.random() - 0.5).slice(0, 5);
     } catch (e) {
-        // Fallback if file doesn't exist to prevent black screen
+        console.error("Question load failed:", e);
         questions = [{
-            question: "File questions.json not found! Is it in your folder?",
-            options: ["Yes", "No", "Maybe", "Check Console"],
-            answer: "Check Console",
-            difficulty: "ERROR"
+            question: "Is the Azuma Clan ready?",
+            options: ["Always", "No", "Perhaps", "Soon"],
+            answer: "Always",
+            difficulty: "EASY"
         }];
     }
 }
 
 function loadQuestion() {
     if (currentQuestionIndex >= questions.length) {
-        // 40% chance to show supporter appreciation if they exist
+        // Show appreciation if supporters are defined in supporters.js
         if (Math.random() < 0.4 && typeof supporters !== 'undefined' && supporters.length > 0) {
             showAppreciationScreen();
         } else {
@@ -162,16 +156,14 @@ function loadQuestion() {
     if (qText) qText.textContent = q.question;
     
     // Update Trial Counters
-    ['current-trial', 'trial-number', 'progress-current'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.textContent = currentQuestionIndex + 1;
-    });
+    const updateText = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
+    updateText('current-trial', currentQuestionIndex + 1);
+    updateText('trial-number', currentQuestionIndex + 1);
+    updateText('progress-current', currentQuestionIndex + 1);
 
-    // Update Difficulty
     const diff = document.querySelector('.diff-level');
     if (diff) diff.textContent = q.difficulty || "NORMAL";
 
-    // Progress Bar
     const fill = document.getElementById('progress-fill');
     if (fill) fill.style.width = `${(currentQuestionIndex / questions.length) * 100}%`;
 
@@ -181,7 +173,7 @@ function loadQuestion() {
         q.options.forEach(opt => {
             const btn = document.createElement('button');
             btn.className = 'btn-ninja';
-            btn.innerHTML = `<span>${opt}</span>`;
+            btn.innerHTML = `<span class="option-text">${opt}</span>`;
             btn.onclick = () => checkAnswer(opt, q.answer);
             optionsDiv.appendChild(btn);
         });
@@ -196,8 +188,9 @@ function checkAnswer(selected, correct) {
     const btns = document.querySelectorAll('#options .btn-ninja');
     btns.forEach(btn => {
         btn.disabled = true;
-        if (btn.textContent === correct) btn.classList.add('correct-flash');
-        if (btn.textContent === selected && !isCorrect) btn.classList.add('incorrect-flash');
+        const txt = btn.querySelector('.option-text')?.textContent;
+        if (txt === correct) btn.style.borderColor = "#00ff00";
+        if (txt === selected && !isCorrect) btn.style.borderColor = "#ff0000";
     });
 
     if (isCorrect) {
@@ -210,10 +203,93 @@ function checkAnswer(selected, correct) {
     setTimeout(() => {
         currentQuestionIndex++;
         loadQuestion();
-    }, 1200);
+    }, 1500);
 }
 
-// ==================== RANKING & STATS ====================
+// ==================== APPRECIATION LOGIC ====================
+
+function showAppreciationScreen() {
+    if (typeof supporters === 'undefined' || supporters.length === 0) {
+        showResults();
+        return;
+    }
+    
+    const supporter = supporters[Math.floor(Math.random() * supporters.length)];
+    const characters = ['rikimaru', 'ayame', 'tatsumaru'];
+    const randomChar = characters[Math.floor(Math.random() * characters.length)];
+    
+    const set = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
+    
+    set('honored-name', supporter.name);
+    set('honored-handle', supporter.handle || '');
+    set('appreciation-text', `Master ${randomChar.toUpperCase()} acknowledges your support.`);
+    
+    const portrait = document.getElementById('appreciation-portrait');
+    if (portrait && typeof getCharacterPortrait === 'function') {
+        portrait.style.backgroundImage = `url('${getCharacterPortrait(randomChar)}')`;
+    }
+    
+    showGameSubScreen('appreciation');
+    if (typeof createGameVFX === 'function') createGameVFX('appreciation');
+}
+
+// ==================== RESULTS & PROGRESSION ====================
+
+function showResults() {
+    const ptsEarned = (correctAnswers * POINTS_PER_CORRECT) + (correctAnswers === 5 ? POINTS_PER_GAME_COMPLETION : 0);
+    const coinsEarned = (correctAnswers * COINS_PER_CORRECT);
+    
+    const oldRank = playerStats.currentRank;
+    const oldTotal = playerStats.totalScore;
+    
+    // Update Stats
+    playerStats.totalScore += ptsEarned;
+    playerStats.coins += coinsEarned;
+    playerStats.trialsCompleted++;
+    playerStats.totalCorrectAnswers += correctAnswers;
+    playerStats.totalQuestionsAnswered += 5;
+    
+    // Check Rank Up
+    for (const [key, req] of Object.entries(rankRequirements)) {
+        if (playerStats.totalScore >= req.minScore) playerStats.currentRank = key;
+    }
+    
+    savePlayerStats();
+
+    // UI Updates
+    const set = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
+    set('result-correct', `${correctAnswers}/5`);
+    set('result-points', `+${ptsEarned}`);
+    set('result-coins', `+${coinsEarned}`);
+    
+    // Animate total score
+    animateValue('result-total', oldTotal, playerStats.totalScore, 1500);
+
+    const rankNotif = document.getElementById('rank-notification');
+    if (rankNotif) rankNotif.style.display = (oldRank !== playerStats.currentRank) ? 'flex' : 'none';
+
+    // Character Feedback
+    const percentage = (correctAnswers / 5) * 100;
+    const feedbackChar = percentage >= 80 ? 'rikimaru' : (percentage >= 60 ? 'ayame' : 'tatsumaru');
+    
+    set('feedback-text', getPerformanceFeedback(feedbackChar, percentage));
+    
+    const fPortrait = document.getElementById('feedback-portrait');
+    if (fPortrait && typeof getCharacterPortrait === 'function') {
+        fPortrait.style.backgroundImage = `url('${getCharacterPortrait(feedbackChar)}')`;
+    }
+
+    showGameSubScreen('results');
+    if (typeof createGameVFX === 'function') createGameVFX(percentage >= 60 ? 'victory' : 'defeat');
+}
+
+function getPerformanceFeedback(character, percentage) {
+    if (character === 'rikimaru') return "Your precision is commendable. Continue to hone your skills.";
+    if (character === 'ayame') return "Well done! Your intuition serves you well in the shadows!";
+    return "Weak. The shadows have no mercy for the unprepared.";
+}
+
+// ==================== STATS DISPLAY ====================
 
 function updateStatsDisplay() {
     const set = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
@@ -229,74 +305,76 @@ function updateStatsDisplay() {
     
     const rank = rankRequirements[playerStats.currentRank];
     set('stat-rank-name', rank.displayName);
-    set('stat-rank-stars', ["☆☆☆", "★☆☆", "★★☆", "★★★"][playerStats.rankStars] || "☆☆☆");
+    
+    const stars = ["☆☆☆", "★☆☆", "★★☆", "★★★"][playerStats.rankStars] || "☆☆☆";
+    set('stat-rank-stars', stars);
 
-    // Progress bar
     if (rank.nextRank) {
         const next = rankRequirements[rank.nextRank];
         const progress = playerStats.totalScore - rank.minScore;
-        const total = next.minScore - rank.minScore;
-        const percent = Math.min(100, Math.floor((progress / total) * 100));
+        const totalNeeded = next.minScore - rank.minScore;
+        const percent = Math.min(100, Math.floor((progress / totalNeeded) * 100));
+        
         set('stat-rank-progress-text', `${playerStats.totalScore}/${next.minScore}`);
         const bar = document.getElementById('stat-rank-progress');
         if (bar) bar.style.width = `${percent}%`;
+    } else {
+        set('stat-rank-progress-text', "MAX RANK REACHED");
     }
-}
-
-function showResults() {
-    const pts = (correctAnswers * POINTS_PER_CORRECT) + (correctAnswers === 5 ? POINTS_PER_GAME_COMPLETION : 0);
-    const coins = (correctAnswers * COINS_PER_CORRECT);
-    
-    const oldRank = playerStats.currentRank;
-    
-    // Update Stats
-    playerStats.totalScore += pts;
-    playerStats.coins += coins;
-    playerStats.trialsCompleted++;
-    playerStats.totalCorrectAnswers += correctAnswers;
-    playerStats.totalQuestionsAnswered += questions.length;
-    
-    // Determine Rank
-    for (const [key, req] of Object.entries(rankRequirements)) {
-        if (playerStats.totalScore >= req.minScore) playerStats.currentRank = key;
-    }
-    
-    savePlayerStats();
-
-    // UI Updates
-    document.getElementById('result-correct').textContent = `${correctAnswers}/5`;
-    document.getElementById('result-points').textContent = `+${pts}`;
-    document.getElementById('result-coins').textContent = `+${coins}`;
-    document.getElementById('result-total').textContent = playerStats.totalScore;
-
-    const rankNotif = document.getElementById('rank-notification');
-    if (rankNotif) rankNotif.style.display = (oldRank !== playerStats.currentRank) ? 'flex' : 'none';
-
-    // Character Feedback
-    const feedbackText = document.getElementById('feedback-text');
-    if (feedbackText) {
-        if (correctAnswers === 5) feedbackText.textContent = "Master Rikimaru: Excellence. You move like a shadow.";
-        else if (correctAnswers >= 3) feedbackText.textContent = "Ayame: Not bad! You have the instincts of the Azuma.";
-        else feedbackText.textContent = "Tatsumaru: Your training is incomplete. The darkness does not forgive.";
-    }
-
-    showGameSubScreen('results');
 }
 
 // ==================== UTILS ====================
 
-function showGameSubScreen(type) {
-    const screens = ['question-screen', 'appreciation-screen', 'result-screen'];
-    screens.forEach(s => {
-        const el = document.getElementById(s);
-        if (el) { el.classList.add('hidden'); el.classList.remove('active'); }
-    });
-    const target = document.getElementById(type + '-screen');
-    if (target) { target.classList.remove('hidden'); target.classList.add('active'); }
+function animateValue(id, start, end, duration) {
+    const obj = document.getElementById(id);
+    if (!obj) return;
+    let startTimestamp = null;
+    const step = (timestamp) => {
+        if (!startTimestamp) startTimestamp = timestamp;
+        const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+        obj.innerHTML = Math.floor(progress * (end - start) + start);
+        if (progress < 1) {
+            window.requestAnimationFrame(step);
+        }
+    };
+    window.requestAnimationFrame(step);
 }
 
-function showAppreciationScreen() {
-    showGameSubScreen('appreciation');
+function sharePlayerStats() {
+    const rank = rankRequirements[playerStats.currentRank].displayName;
+    const text = `🏯 Tenchu Shiren\nRank: ${rank}\nScore: ${playerStats.totalScore}\nCan you beat me?`;
+    if (navigator.share) {
+        navigator.share({ title: 'My Shinobi Stats', text: text, url: window.location.href });
+    } else {
+        navigator.clipboard.writeText(text).then(() => alert("Stats copied to clipboard!"));
+    }
 }
 
-window.addEventListener('load', loadPlayerStats);
+// ==================== EXPORTS FOR HTML ====================
+
+window.setPlayerName = () => {
+    const input = document.getElementById('player-name-input');
+    if (input && input.value.trim()) {
+        playerName = input.value.trim();
+        savePlayerStats();
+    }
+    startGame();
+};
+
+window.showPlayerNameScreen = () => showScreen('player-name-screen');
+window.showInfo = () => showScreen('info');
+window.showSupporters = () => showScreen('supporters-screen');
+window.showStatsScreen = () => { showScreen('stats-screen'); updateStatsDisplay(); };
+window.showMissionsScreen = () => showScreen('missions-screen');
+window.backToMenu = () => { gameActive = false; showScreen('menu'); };
+window.showStatsScreenFromResults = () => { showScreen('stats-screen'); updateStatsDisplay(); };
+window.shareStats = sharePlayerStats;
+window.showResults = showResults; // Needed for the 'See Results' button
+
+// Load stats on page load
+window.addEventListener('load', () => {
+    loadPlayerStats();
+    // Initialize VH for mobile as per your index.html script
+    const vh = window.innerHeight * 0.01;
+    document.documentElement.style.setProperty('--vh', `${vh}px`);
+});
