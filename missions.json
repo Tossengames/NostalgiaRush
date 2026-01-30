@@ -1,0 +1,90 @@
+{
+  "missions": [
+    {
+      "id": "shadow_infiltration",
+      "title": "Shadow Infiltration",
+      "description": "Infiltrate Lord Gohda's mansion to steal secret documents. Failure means death.",
+      "difficulty": "easy",
+      "requiredRank": "apprentice",
+      "theme": "stealth",
+      "timeOfDay": "night",
+      "reward": {
+        "coins": 150,
+        "points": 200,
+        "unlockItem": "smoke_bomb"
+      },
+      "requirements": {
+        "minCoins": 50,
+        "maxTries": 3
+      },
+      "story": [
+        {
+          "scene": "gate",
+          "image": "m1s1.png",
+          "text": "The moon is high. You stand before Lord Gohda's heavily guarded mansion. Two guards patrol the main gate, their lanterns cutting through the darkness. One guard yawns, the other sharpens his blade.",
+          "options": [
+            {
+              "text": "Wait for guard rotation gap (5 minutes)",
+              "nextScene": "patience_gate",
+              "stealthBonus": 20,
+              "feedback": "Patience is a virtue. The guards complete their rotation, creating a 30-second window."
+            },
+            {
+              "text": "Scale the outer wall with grappling hook",
+              "nextScene": "wall_climb",
+              "requiredItem": "grappling_hook",
+              "stealthBonus": 15,
+              "itemUsed": "grappling_hook",
+              "feedback": "Your hook finds purchase. You ascend silently into the shadows."
+            },
+            {
+              "text": "Create distraction with firecrackers",
+              "nextScene": "distraction",
+              "requiredItem": "firecracker",
+              "stealthBonus": 10,
+              "itemUsed": "firecracker",
+              "alertRisk": 30,
+              "feedback": "The crackle draws guards away, but others might investigate."
+            }
+          ],
+          "itemsAllowed": ["grappling_hook", "firecracker", "smoke_bomb"],
+          "ifSpotted": "MISSION_FAILED",
+          "fallbackImage": "gate_scene"
+        },
+        {
+          "scene": "patience_gate",
+          "image": "m1s2a.png",
+          "text": "Your patience is rewarded. The guards move to opposite ends of their patrol. You have exactly 27 seconds to slip through the gate undetected.",
+          "options": [
+            {
+              "text": "Sprint through the opening",
+              "nextScene": "courtyard_fast",
+              "stealthPenalty": 10,
+              "feedback": "You move swiftly but risk being seen in motion."
+            },
+            {
+              "text": "Walk slowly, staying in shadows",
+              "nextScene": "courtyard_slow",
+              "stealthBonus": 15,
+              "feedback": "Every shadow is your ally. You become part of the darkness."
+            }
+          ],
+          "fallbackImage": "courtyard_night"
+        }
+      ],
+      "successScene": {
+        "title": "GHOST IN THE NIGHT",
+        "image": "m1_success.png",
+        "text": "Not a soul detected your presence. The documents are now in Azuma hands. Master Tatsumaru nods in rare approval.",
+        "bonusPoints": 100,
+        "unlockedMissions": ["assassination_order", "poison_delivery"]
+      },
+      "failureScene": {
+        "title": "FAILURE IS DEATH",
+        "image": "m1_fail.png",
+        "text": "A guard's shout echoes through the night. Arrows find their mark. The Azuma clan will send another... but your name is forgotten.",
+        "penalty": 0
+      }
+    }
+  ]
+}
